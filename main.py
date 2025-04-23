@@ -9,7 +9,7 @@ pygame.init()
 
 import util.statics as stat
 import util.utils as u
-from core.loops import HighscoreLoop, GameLoop, IntroLoop
+from core.loops import HighscoreLoop, BalanceLoop, IntroLoop, SwingupLoop, ExperimentalLoop
 
 
 # display
@@ -23,11 +23,14 @@ balance_highscore_path = "balance_highscore.json"
 swingup_highscore_path = "swingup_highscore.json"
 
 # loops
-hs_loop = HighscoreLoop(game_display, clock, highscore_path=balance_highscore_path)
-game_loop = GameLoop(game_display, clock, highscore_path=balance_highscore_path)
-intro_loop = IntroLoop(game_display, clock, game_loop=game_loop.run, hs_loop=hs_loop.run)
+hs_loop = HighscoreLoop(game_display, clock, balance_highscore_path, swingup_highscore_path)
+balance_loop = BalanceLoop(game_display, clock, highscore_path=balance_highscore_path)
+swingup_loop = SwingupLoop(game_display, clock, highscore_path=swingup_highscore_path)
+exp_loop = ExperimentalLoop(game_display, clock)
+intro_loop = IntroLoop(game_display, clock, loops=[balance_loop, swingup_loop, hs_loop, exp_loop])
+
 
 # gogo
 intro_loop.run()
-# game_loop.run()
+
 

@@ -16,7 +16,7 @@ def message_display(disp, msg, text_color=BLACK):
     pygame.display.update()
 
 class Button():
-    def __init__(self, disp, x, y, w, h, inactive_color, active_color, text, font, text_color=BLACK, action=None, action_args=[]) -> None:
+    def __init__(self, disp, x, y, w, h, inactive_color, active_color, text, font=NORMAL_FONT, text_color=BLACK, action=None, action_args=[]) -> None:
         self.disp = disp
         self.x = x
         self.y = y
@@ -170,3 +170,38 @@ class InputBox:
         screen.blit(self.txt_surface, (self.rect.x+5, self.rect.y+2))
         # Blit the rect.
         pygame.draw.rect(screen, self.color, self.rect, 2)
+
+class Slider:
+    def __init__(self, disp, x, y, w=50, h=20, value=0, value_range=[-1, 1]) -> None:
+        self.disp = disp
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.value = value
+        self.initial_value = value
+        self.value_range = value_range
+        self.rect = pygame.Rect(self.x, self.y, self.w, self.h)
+        self.reset_button = Button(
+            self.disp, self.x, self.y + self.h + 2, self.w, self.h, GRAY2, GRAY1, "reset", action=self.reset
+        )
+
+    def show(self):
+        pygame.draw.rect(self.disp, BLACK, self.rect, width=2)
+        pos = (
+            self.x + (self.value - self.initial_value) / (self.value_range[-1] - self.value_range[0]) * self.w + self.w / 2,
+            self.y + self.h / 2,
+        )
+        pygame.draw.circle(self.disp, color=BLUE, center=pos, radius=5)
+        self.reset_button.show()
+        print_on_screen(self.disp, str(round(self.value, 2)), (self.x - 50, self.y))
+
+    def update(self, event_list):
+        for event in event_list:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                if self.rect.collidepoint(mouse_pos):
+                    self.value = self.initial_value + ((mouse_pos[0] - self.x) / self.w - 0.5) * (self.value_range[-1] - self.value_range[0])
+
+    def reset(self):
+        self.value = self.initial_value

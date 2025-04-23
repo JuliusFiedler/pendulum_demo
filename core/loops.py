@@ -22,7 +22,7 @@ class Loop():
         self.clock = clock
         # define fps
         self.clock.tick(stat.FPS)
-        self.row_template = "{:<2}.: {:<5} s,   {}"
+        self.row_template = "{:<2}.  {:<5} s,   {}"
 
     @abstractmethod
     def run(self):
@@ -32,10 +32,9 @@ class Loop():
         return item[1]
 
 class IntroLoop(Loop):
-    def __init__(self, game_display, clock, game_loop, hs_loop) -> None:
+    def __init__(self, game_display, clock, loops:list) -> None:
         super().__init__(game_display, clock)
-        self.game_loop = game_loop
-        self.hs_loop = hs_loop
+        self.loops = loops
         from_border_x = 150
         from_border_y = 250
         self.button_1_size = self.button_2_size = (400, 50)
@@ -47,11 +46,13 @@ class IntroLoop(Loop):
 
     def run(self):
         b_stabilize = u.Button(self.display, self.button_1_pos[0], self.button_1_pos[1], self.button_1_size[0], self.button_1_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Balancieren", stat.BUTTON_FONT, action=self.game_loop)
+                stat.GREEN, stat.LIGHT_GREEN, "Balancieren", stat.BUTTON_FONT, action=self.loops[0].run)
         b_multi = u.Button(self.display, self.button_1_pos[0], self.button_1_pos[1]+self.button_1_size[1]+5, self.button_1_size[0], self.button_1_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Aufschwingen", stat.BUTTON_FONT, action=self.game_loop)
+                stat.GREEN, stat.LIGHT_GREEN, "Aufschwingen", stat.BUTTON_FONT, action=self.loops[1].run)
         b_hs = u.Button(self.display, self.button_1_pos[0], self.button_1_pos[1]+(self.button_1_size[1]+5)*2, self.button_1_size[0], self.button_1_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Highscore", stat.BUTTON_FONT, action=self.hs_loop)
+                stat.GREEN, stat.LIGHT_GREEN, "Highscore", stat.BUTTON_FONT, action=self.loops[2].run)
+        b_exp = u.Button(self.display, self.button_1_pos[0], self.button_1_pos[1]+(self.button_1_size[1]+5)*3, self.button_1_size[0], self.button_1_size[1], \
+                stat.GREEN, stat.LIGHT_GREEN, "Experiment", stat.BUTTON_FONT, action=self.loops[3].run)
         b2 = u.Button(self.display, self.button_2_pos[0], self.button_2_pos[1], self.button_2_size[0], self.button_2_size[1], \
                 stat.RED, stat.LIGHT_RED, "Exit", stat.BUTTON_FONT, action=u.exit_game)
         while True:
@@ -71,6 +72,7 @@ class IntroLoop(Loop):
             b_stabilize.show()
             b_multi.show()
             b_hs.show()
+            b_exp.show()
             # b2.show()
 
 
@@ -86,25 +88,25 @@ class GameLoop(Loop):
         self.masscart = 1.0
         self.masspole = 0.1
         self.total_mass = self.masspole + self.masscart
-        self.length = 1  # actually half the pole's length
-        #! pole has length 2*l
-        self.polemass_length = self.masspole * self.length
-        self.force_mag = 10.0
         self.tau = 0.01  # seconds between state updates
         self.kinematics_integrator = "solve_ivp"  # "euler"
-        self.F = 10
-
-        # Angle at which to fail the episode
-        self.theta_threshold_radians = 90 * 2 * math.pi / 360
-        self.x_threshold = 2.16
 
         self.highscore_path = highscore_path
 
-        self.max_tries = 2
+        self.max_tries = 1
+
+        self.x_threshold = 2.16
+        def back(obj):
+            obj.exit = True
+        self.return_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-70, 0, 70, 20, stat.RED, stat.LIGHT_RED, "Zurück", stat.NORMAL_FONT, action=back, action_args=[self])
 
         self.init()
 
     def init(self):
+        self.length = 1  # actually half the pole's length
+        #! pole has length 2*l
+        self.polemass_length = self.masspole * self.length
+        self.F = 10
         self.next_action = 0
         self.t0 = time.time()
 
@@ -113,16 +115,19 @@ class GameLoop(Loop):
         self.exit = False
 
         self.times = []
-        self.current_best = 0
-        self.number_of_tries = 0
+        self.current_best = None
+        self.number_of_tries = -1
         self.countdown = False
         self.countdown_start = None
 
-        with open(self.highscore_path, "rt") as f:
-            self.highscore_dict = json.load(f)
-        player, p_time = sorted(self.highscore_dict.items(), key=self.sorting_function, reverse=True)[0]
-        self.highscore = f"{np.round(p_time, 1)} s, von {player}"
+        self.highscore = self.get_highscore()
         self.reset()
+        self.times = []
+        self.current_best = None
+
+    @abstractmethod
+    def get_highscore(self):
+        raise NotImplementedError()
 
     def calc_new_state(self, action):
         x, x_dot, theta, theta_dot = self.state
@@ -162,33 +167,49 @@ class GameLoop(Loop):
         if not self.countdown:
             self.state = self.calc_new_state(action)
         self.render()
-        x, x_dot, theta, theta_dot = self.state
-        terminated = bool(
-            x < -self.x_threshold
-            or x > self.x_threshold
-            or theta < -self.theta_threshold_radians
-            or theta > self.theta_threshold_radians
-        )
+
+        terminated = self.get_terminated()
 
         return self.state, 0, terminated, False, {}
 
+    @abstractmethod
+    def get_terminated(self):
+        raise NotImplementedError()
+
     def reset(self):
         self.times.append(time.time()- self.t0)
-        self.current_best = max(self.times)
+        self.current_best = self.get_current_best()
 
         # random state
-        self.state = [0, 0, (np.random.random()-0.5)*0.1, 0]
+        self.state = self.get_start_state()
         # self.state = [2.16, 0, 0, 0]
         self.number_of_tries += 1
         self.countdown_start = time.time()
         self.countdown = True
-        self.render()
+        # self.render()
 
         if self.number_of_tries >= self.max_tries:
             self.exit = True
 
-    def render(self):
+    @abstractmethod
+    def get_start_state(self):
+        raise NotImplementedError()
 
+    @abstractmethod
+    def get_current_best(self):
+        raise NotImplementedError()
+
+    def render(self):
+        self._render_base()
+        self._render_ui()
+        self._event_handling()
+        self._render_custom()
+        self._render_post_pro()
+
+    def _render_custom(self):
+        pass
+
+    def _render_base(self):
         world_width = self.x_threshold * 2
         scale = stat.DISPLAY_SIZE[0] / world_width
         polewidth = 10.0
@@ -262,7 +283,9 @@ class GameLoop(Loop):
 
         # flip coordinates
         self.surf = pygame.transform.flip(self.surf, False, True)
+        self.display.blit(self.surf, (0, 0))
 
+    def _render_ui(self):
         # show state on screen
         p = precision = 3
         # u.print_on_screen(self.surf, f"pos {np.round(x[0], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 10))
@@ -275,9 +298,10 @@ class GameLoop(Loop):
             u.print_on_screen(self.surf, f"Zeit {0.00} s", (10, 10), stat.LARGE_FONT)
         else:
             u.print_on_screen(self.surf, f"Zeit {np.round(time.time()-self.t0, 1)} s", (10, 10), stat.LARGE_FONT)
-        u.print_on_screen(self.surf, f"aktuelle Bestzeit {np.round(self.current_best, 1)} s", (10, 120))
-        u.print_on_screen(self.surf, f"Highscore: {self.highscore}", (stat.DISPLAY_SIZE[0]-400, 10))
-        u.print_on_screen(self.surf, f"Versuch: {self.number_of_tries+1}/{self.max_tries}", (stat.DISPLAY_SIZE[0]-400, 30))
+        cb = np.round(self.current_best, 1) if self.current_best is not None else "-"
+        u.print_on_screen(self.surf, f"aktuelle Bestzeit {cb} s", (10, 120))
+        u.print_on_screen(self.surf, f"Highscore: {self.highscore}", (stat.DISPLAY_SIZE[0]-400, 40))
+        u.print_on_screen(self.surf, f"Versuch: {self.number_of_tries+1}/{self.max_tries}", (stat.DISPLAY_SIZE[0]-400, 60))
         if self.countdown:
             n = 3-int(time.time() - self.countdown_start)
             if n >= 0:
@@ -286,14 +310,14 @@ class GameLoop(Loop):
                 self.t0 = time.time()
                 self.countdown = False
 
-
-
         self.display.blit(self.surf, (0, 0))
+
+    def _event_handling(self):
         pygame.event.pump()
+        self.events = pygame.event.get()
 
         # some event handling for interactivity
-        push_angle = 10.0 / 180 * np.pi
-        for ev in pygame.event.get():
+        for ev in self.events:
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
@@ -309,39 +333,38 @@ class GameLoop(Loop):
                     if ev.key == pygame.K_RIGHT:
                         self.next_action = 0
 
+    def _render_post_pro(self):
+        self.return_button.show()
         self.clock.tick(stat.FPS)
         pygame.display.flip()
 
-
-
-
     def run(self):
         self.init()
-        self.number_of_tries = 0
         while(not self.exit):
             state, reward, terminated, truncated, info = self.step()
             if terminated or truncated:
                 self.reset()
+        if self.current_best:
+            hs, pos = self.get_highscore_and_position()
+            # low results will not be shown
+            if pos <= 17:
+                self.enter_name_highscore(highscores=hs, position=pos)
 
-        with open(self.highscore_path, "rt") as f:
-            self.highscore_dict = json.load(f)
+    @abstractmethod
+    def get_highscore_and_position(self):
+        raise NotImplementedError()
 
-        def sorting_function2(item):
-            return -item
-        # bisect only works with ascending lists
-        position = bisect.bisect_right(np.array(sorted(self.highscore_dict.values(), key=sorting_function2), dtype=float)*-1, -self.current_best)
-        highscores = sorted(self.highscore_dict.items(), reverse=True, key=self.sorting_function)
-        highscores.insert(position, ("", self.current_best))
-
+    def enter_name_highscore(self, highscores:list, position:int):
+        """highscores is a list of tuples [("1235142561__bob", 1.5), ("1238713812__mob", 2.4)]"""
         self.input_box = u.InputBox(100, 127+position*40, 300, 20, "Name")
         pygame.event.pump()
         done = False
         while(not done):
             self.display.fill(stat.WHITE)
             u.print_on_screen(self.display, f"Highscore", (10, 10), stat.LARGE_FONT)
-            for i, (player, p_time) in enumerate(highscores):
+            for i, (player_id, p_time) in enumerate(highscores):
+                player = player_id.split("__")[-1]
                 y = 130+i*40
-                # u.print_on_screen(self.display, f"{i+1}.: {np.round(p_time, 2)} s, {player}", (10, y))
                 u.print_on_screen(self.display, self.row_template.format(i+1, np.round(p_time, 2), player), (10, y))
 
             for ev in pygame.event.get():
@@ -357,19 +380,166 @@ class GameLoop(Loop):
             self.input_box.show(self.display)
             self.clock.tick(stat.FPS)
             pygame.display.flip()
-        self.highscore_dict[self.input_box.text] = self.current_best
+        player_id = f"{time.time()}__{self.input_box.text}"
+        self.highscore_dict[player_id] = self.current_best
         with open(self.highscore_path, "wt") as f:
             json.dump(self.highscore_dict, f)
 
+
 class BalanceLoop(GameLoop):
+    def __init__(self, game_display, clock, highscore_path):
+        super().__init__(game_display, clock, highscore_path)
+        # Angle at which to fail the episode
+        self.theta_threshold_radians = 90 * 2 * math.pi / 360
+
+    def get_terminated(self):
+        x, x_dot, theta, theta_dot = self.state
+        terminated = bool(
+            x < -self.x_threshold
+            or x > self.x_threshold
+            or theta < -self.theta_threshold_radians
+            or theta > self.theta_threshold_radians
+        )
+        return terminated
+
+    def get_highscore_and_position(self):
+        with open(self.highscore_path, "rt") as f:
+            self.highscore_dict = json.load(f)
+
+        def sorting_function2(item):
+            return -item
+        # bisect only works with ascending lists
+        position = bisect.bisect_right(np.array(sorted(self.highscore_dict.values(), key=sorting_function2), dtype=float)*-1, -self.current_best)
+        highscores = sorted(self.highscore_dict.items(), reverse=True, key=self.sorting_function)
+        highscores.insert(position, ("", self.current_best))
+
+        return highscores, position
+
+    def get_current_best(self):
+        return max(self.times)
+
+    def get_start_state(self):
+        return [0, 0, (np.random.random()-0.5)*0.1, 0]
+
+    def get_highscore(self):
+        with open(self.highscore_path, "rt") as f:
+            self.highscore_dict = json.load(f)
+        player_id, p_time = sorted(self.highscore_dict.items(), key=self.sorting_function, reverse=True)[0]
+        player = player_id.split("__")[-1]
+        return f"{np.round(p_time, 1)} s, von {player}"
+
+class ExperimentalLoop(GameLoop):
     def __init__(self, game_display, clock):
-        super().__init__(game_display, clock)
+        self.mode = 1 # 1=balance, -1 = swingup
+        super().__init__(game_display, clock, None)
+        # Angle at which to fail the episode
+        self.theta_threshold_radians = 90 * 2 * math.pi / 360
+        self.length_slider = u.Slider(game_display, 120, 10, 400, value=self.length, value_range=[0.1, 2])
+        self.force_slider = u.Slider(game_display, 120, 70, 400, value=self.F, value_range=[0.1, 20])
+        self.max_tries = 999
+        self.reset_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 50, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Reset", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.reset, action_args=[])
+        self.toggle_mode_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 90, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Aufschwingen", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.toggle_mode, action_args=[])
+
+    def get_terminated(self):
+        x, x_dot, theta, theta_dot = self.state
+        if self.mode == -1:
+            terminated = bool(
+                x < -self.x_threshold
+                or x > self.x_threshold
+            )
+        elif self.mode == 1:
+            terminated = bool(
+                x < -self.x_threshold
+                or x > self.x_threshold
+                or theta < -self.theta_threshold_radians
+                or theta > self.theta_threshold_radians
+            )
+
+        return terminated
+
+    def toggle_mode(self):
+        self.mode *= -1
+        # button label opposite (what you click on is what you want)
+        if self.mode == -1:
+            self.toggle_mode_button.text = "Balance"
+        elif self.mode == 1:
+            self.toggle_mode_button.text = "Aufschwingen"
+        self.reset()
+
+    def get_highscore_and_position(self):
+        return 0, None
+
+    def get_current_best(self):
+        return None
+
+    def get_start_state(self):
+        if self.mode == 1:
+            return [0, 0, (np.random.random()-0.5)*0.1, 0]
+        elif self.mode == -1:
+            return [0, 0, np.pi+(np.random.random()-0.5)*0.1, 0]
+
+    def get_highscore(self):
+        return ""
+
+    def _render_ui(self):
+        self.countdown = False
+        u.print_on_screen(self.display, f"Länge", (10, 10), stat.NORMAL_FONT)
+        u.print_on_screen(self.display, f"Kraft", (10, 70), stat.NORMAL_FONT)
+
+    def _render_custom(self):
+        self.length_slider.update(self.events)
+        self.length = self.length_slider.value
+        self.length_slider.show()
+
+        self.force_slider.update(self.events)
+        self.F = self.force_slider.value
+        self.force_slider.show()
+
+        self.reset_button.show()
+        self.toggle_mode_button.show()
+
+class SwingupLoop(GameLoop):
+    def __init__(self, game_display, clock, highscore_path):
+        super().__init__(game_display, clock, highscore_path)
+        self.theta_threshold_radians = 10 * 2 * math.pi / 360
+
+
+    def get_terminated(self):
+        return False
+
+    def get_highscore_and_position(self):
+        with open(self.highscore_path, "rt") as f:
+            self.highscore_dict = json.load(f)
+
+        def sorting_function2(item):
+            return -item
+        # bisect only works with ascending lists
+        position = bisect.bisect_right(np.array(sorted(self.highscore_dict.values(), key=sorting_function2), dtype=float)*-1, -self.current_best)
+        highscores = sorted(self.highscore_dict.items(), reverse=True, key=self.sorting_function)
+        highscores.insert(position, ("", self.current_best))
+
+        return highscores, position
+
+    def get_current_best(self):
+        return min(self.times)
+
+    def get_start_state(self):
+        return [0, 0, np.pi + (np.random.random()-0.5)*0.1, 0]
+
+    def get_highscore(self):
+        with open(self.highscore_path, "rt") as f:
+            self.highscore_dict = json.load(f)
+        player_id, p_time = sorted(self.highscore_dict.items(), key=self.sorting_function)[0]
+        player = player_id.split("__")[-1]
+        return f"{np.round(p_time, 1)} s, von {player}"
+
 
 
 class HighscoreLoop(Loop):
-    def __init__(self, game_display, clock, highscore_path):
+    def __init__(self, game_display, clock, balance_highscore_path, swingup_highscore_path):
         super().__init__(game_display, clock)
-        self.highscore_path = highscore_path
+        self.balance_highscore_path = balance_highscore_path
+        self.swingup_highscore_path = swingup_highscore_path
         self.done = False
         def back(obj):
             obj.done = True
@@ -377,25 +547,34 @@ class HighscoreLoop(Loop):
 
     def run(self):
         self.done = False
-        with open(self.highscore_path, "rt") as f:
-            self.highscore_dict = json.load(f)
+        with open(self.balance_highscore_path, "rt") as f:
+            self.balance_highscore_dict = json.load(f)
+        balance_highscores = sorted(self.balance_highscore_dict.items(), reverse=True, key=self.sorting_function)
 
-        highscores = sorted(self.highscore_dict.items(), reverse=True, key=self.sorting_function)
+        with open(self.swingup_highscore_path, "rt") as f:
+            self.swingup_highscore_dict = json.load(f)
+        swingup_highscores = sorted(self.swingup_highscore_dict.items(), key=self.sorting_function)
 
         pygame.event.pump()
         while(not self.done):
             self.display.fill(stat.WHITE)
             u.print_on_screen(self.display, f"Highscore", (10, 10), stat.LARGE_FONT)
-            for i, (player, p_time) in enumerate(highscores):
-                y = 130+i*40
+            u.print_on_screen(self.display, f"Balance", (10, 140), stat.MEDIUM_FONT)
+            u.print_on_screen(self.display, f"Aufschwingen", (20+stat.DISPLAY_SIZE[0]//2, 140), stat.MEDIUM_FONT)
+            for i, (player_id, p_time) in enumerate(balance_highscores):
+                player = player_id.split("__")[-1]
+                y = 180+i*40
                 u.print_on_screen(self.display, self.row_template.format(i+1, np.round(p_time, 2), player), (10, y))
+            for i, (player_id, p_time) in enumerate(swingup_highscores):
+                player = player_id.split("__")[-1]
+                y = 180+i*40
+                u.print_on_screen(self.display, self.row_template.format(i+1, np.round(p_time, 2), player), (20+stat.DISPLAY_SIZE[0]//2, y))
 
 
             for ev in pygame.event.get():
-                if ev.type == pygame.KEYDOWN:
-                    if ev.type == pygame.QUIT:
-                        pygame.quit()
-                        sys.exit()
+                if ev.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
             self.return_button.show()
             self.clock.tick(stat.FPS)
             pygame.display.flip()
