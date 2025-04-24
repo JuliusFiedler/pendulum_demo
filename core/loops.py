@@ -103,7 +103,7 @@ class GameLoop(Loop):
         self.length = 1  # actually half the pole's length
         #! pole has length 2*l
         self.F = 7
-        self.my = 0.01 # friction
+        self.my = 0.00 # friction
 
         self.next_action = 0
         self.t0 = time.time()
@@ -133,22 +133,6 @@ class GameLoop(Loop):
         # based on mathematical pendulum
 
         def rhs(t, state):
-            # x, x_dot, theta, theta_dot = state
-            # x1, x2, x3, x4 = x, theta, x_dot, theta_dot  # change order
-            # g = self.gravity
-            # l = self.length
-            # m1 = self.masscart
-            # m2 = self.masspole
-            # my = self.my
-            # u1 = action
-            # dx1_dt = x3
-            # dx2_dt = x4
-            # dx3_dt = (-g * m2 * np.sin(2 * x2) / 2 + l * m2 * theta_dot**2 * np.sin(x2) + u1) / (
-            #     m1 + m2 * np.sin(x2) ** 2
-            # )
-            # dx4_dt = (g * (m1 + m2) * np.sin(x2) - (l * m2 * theta_dot**2 * np.sin(x2) + u1) * np.cos(x2)) / (
-            #     l * (m1 + m2 * np.sin(x2) ** 2)
-            # )
             x, x_dot, theta, theta_dot = state
             x1, p1, x3, pdot1 = x, theta, x_dot, theta_dot  # change order
             g = self.gravity
@@ -472,9 +456,10 @@ class ExperimentalLoop(GameLoop):
         super().__init__(game_display, clock, None)
         # Angle at which to fail the episode
         self.theta_threshold_radians = 90 * 2 * math.pi / 360
-        self.length_slider = u.Slider(game_display, 120, 10, 400, value=self.length, value_range=[0.1, 2])
-        self.force_slider = u.Slider(game_display, 120, 70, 400, value=self.F, value_range=[0, 20])
-        self.friction_slider = u.Slider(game_display, 120, 130, 400, value=self.my, value_range=[0, 0.01], round_to=4)
+        x_pos_sliders = 140
+        self.length_slider = u.Slider(game_display, x_pos_sliders, 10, 400, value=self.length, value_range=[0.1, 2])
+        self.force_slider = u.Slider(game_display, x_pos_sliders, 70, 400, value=self.F, value_range=[0, 20])
+        self.friction_slider = u.Slider(game_display, x_pos_sliders, 130, 400, value=self.my, value_range=[0, 0.1], round_to=4)
         self.max_tries = 999
         self.reset_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 50, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Reset", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.reset, action_args=[])
         self.toggle_mode_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 90, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Aufschwingen", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.toggle_mode, action_args=[])
@@ -524,6 +509,7 @@ class ExperimentalLoop(GameLoop):
         self.countdown = False
         u.print_on_screen(self.display, f"Länge", (10, 10), stat.NORMAL_FONT)
         u.print_on_screen(self.display, f"Kraft", (10, 70), stat.NORMAL_FONT)
+        u.print_on_screen(self.display, f"Reibung", (10, 130), stat.NORMAL_FONT)
 
     def _render_custom(self):
         self.length_slider.update(self.events)
@@ -534,9 +520,9 @@ class ExperimentalLoop(GameLoop):
         self.F = self.force_slider.value
         self.force_slider.show()
 
-        # self.friction_slider.update(self.events)
-        # self.my = self.friction_slider.value
-        # self.friction_slider.show()
+        self.friction_slider.update(self.events)
+        self.my = self.friction_slider.value
+        self.friction_slider.show()
 
         self.reset_button.show()
         self.toggle_mode_button.show()
