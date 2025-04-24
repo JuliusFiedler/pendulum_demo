@@ -190,7 +190,7 @@ class Slider:
     def show(self):
         pygame.draw.rect(self.disp, BLACK, self.rect, width=2)
         pos = (
-            self.x + (self.value - self.value_range[0]) / (self.value_range[-1] - self.value_range[0]) * self.w, #+ self.w / 2,
+            self.x + (self.value - self.value_range[0]) / (self.value_range[-1] - self.value_range[0]) * self.w,
             self.y + self.h / 2,
         )
         pygame.draw.circle(self.disp, color=BLUE, center=pos, radius=5)

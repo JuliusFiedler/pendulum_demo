@@ -74,6 +74,11 @@ class GameLoop(Loop):
     def __init__(self, game_display, clock, highscore_path) -> None:
         super().__init__(game_display, clock)
 
+        # render
+        self.cartwidth = 50.0
+        self.cartheight = 30.0
+        self.polewidth = 10.0
+
         # physics
         self.gravity = 9.8
         self.masscart = 1.0
@@ -104,6 +109,7 @@ class GameLoop(Loop):
         self.t0 = time.time()
 
         self.state = None
+        self.last_state = None
         self.action = None
         self.exit = False
 
@@ -173,6 +179,7 @@ class GameLoop(Loop):
         action = self.next_action
         self.action = action
         if not self.countdown:
+            self.last_state = self.state
             self.state = self.calc_new_state(action)
         self.render()
 
@@ -210,7 +217,8 @@ class GameLoop(Loop):
         raise NotImplementedError()
 
     def render(self):
-        self._render_base()
+        self._render_init()
+        self._render_cart()
         self._render_ui()
         self._event_handling()
         self._render_custom()
@@ -219,24 +227,22 @@ class GameLoop(Loop):
     def _render_custom(self):
         pass
 
-    def _render_base(self):
+    def _render_init(self):
+        self.surf = pygame.Surface(stat.DISPLAY_SIZE)
+        self.surf.fill((255, 255, 255))
+
+    def _render_cart(self):
         world_width = self.x_threshold * 2
         scale = stat.DISPLAY_SIZE[0] / world_width
-        polewidth = 10.0
         polelen = scale * (self.length)
-        cartwidth = 50.0
-        cartheight = 30.0
 
         if self.state is None:
             return None
 
         x = self.state
 
-        self.surf = pygame.Surface(stat.DISPLAY_SIZE)
-        self.surf.fill((255, 255, 255))
-
-        l, r, t, b = -cartwidth / 2, cartwidth / 2, cartheight / 2, -cartheight / 2
-        axleoffset = cartheight / 4.0
+        l, r, t, b = -self.cartwidth / 2, self.cartwidth / 2, self.cartheight / 2, -self.cartheight / 2
+        axleoffset = self.cartheight / 4.0
         cartx = x[0] * scale + stat.DISPLAY_SIZE[0] / 2.0  # MIDDLE OF CART
         carty = 100  # TOP OF CART
         cart_coords = [(l, b), (l, t), (r, t), (r, b)]
@@ -245,10 +251,10 @@ class GameLoop(Loop):
         gfxdraw.filled_polygon(self.surf, cart_coords, (0, 0, 0))
 
         l, r, t, b = (
-            -polewidth / 2,
-            polewidth / 2,
-            polelen - polewidth / 2,
-            -polewidth / 2,
+            -self.polewidth / 2,
+            self.polewidth / 2,
+            polelen - self.polewidth / 2,
+            -self.polewidth / 2,
         )
 
         pole_coords = []
@@ -263,14 +269,14 @@ class GameLoop(Loop):
             self.surf,
             int(cartx),
             int(carty + axleoffset),
-            int(polewidth / 2),
+            int(self.polewidth / 2),
             (129, 132, 203),
         )
         gfxdraw.filled_circle(
             self.surf,
             int(cartx),
             int(carty + axleoffset),
-            int(polewidth / 2),
+            int(self.polewidth / 2),
             (129, 132, 203),
         )
         # Center of Mass
@@ -280,7 +286,7 @@ class GameLoop(Loop):
             self.surf,
             int(com_x),
             int(com_y),
-            int(polewidth / 2),
+            int(self.polewidth / 2),
             (129, 132, 203),
         )
 
@@ -297,9 +303,9 @@ class GameLoop(Loop):
         # show action
         arr_w, arr_h = self.arrow_img.get_size()
         if self.action > 0:
-            self.surf.blit(self.arrow_img, (cartx + cartwidth//2, carty-cartheight+5))
+            self.surf.blit(self.arrow_img, (cartx + self.cartwidth//2, carty-self.cartheight+5))
         if self.action < 0:
-            self.surf.blit(pygame.transform.flip(self.arrow_img, flip_x=True, flip_y=False), (cartx - cartwidth//2 - arr_w, carty-cartheight+5))
+            self.surf.blit(pygame.transform.flip(self.arrow_img, flip_x=True, flip_y=False), (cartx - self.cartwidth//2 - arr_w, carty-self.cartheight+5))
 
         # flip coordinates
         self.surf = pygame.transform.flip(self.surf, False, True)
@@ -380,7 +386,10 @@ class GameLoop(Loop):
         pygame.event.pump()
         done = False
         while(not done):
-            self.display.fill(stat.WHITE)
+            # load last state so we can display it after reset during highscore
+            self.state = self.last_state
+            self._render_init()
+            self._render_cart()
             u.print_on_screen(self.display, f"Highscore", (10, 10), stat.LARGE_FONT)
             for i, (player_id, p_time) in enumerate(highscores):
                 player = player_id.split("__")[-1]
@@ -527,7 +536,7 @@ class ExperimentalLoop(GameLoop):
 class SwingupLoop(GameLoop):
     def __init__(self, game_display, clock, highscore_path):
         super().__init__(game_display, clock, highscore_path)
-        self.theta_threshold_radians = 10 * 2 * math.pi / 360
+        self.theta_threshold_radians = 5 * 2 * math.pi / 360
         self.success = False
 
 
@@ -568,6 +577,30 @@ class SwingupLoop(GameLoop):
         player_id, p_time = sorted(self.highscore_dict.items(), key=self.sorting_function)[0]
         player = player_id.split("__")[-1]
         return f"{np.round(p_time, 1)} s, von {player}"
+
+    def render(self):
+        self._render_init()
+        self._render_custom()
+        self._render_cart()
+        self._render_ui()
+        self._event_handling()
+        self._render_post_pro()
+
+    def _render_custom(self):
+        x = self.state
+        world_width = self.x_threshold * 2
+        scale = stat.DISPLAY_SIZE[0] / world_width
+
+        axleoffset = self.cartheight / 4.0
+        cartx = x[0] * scale + stat.DISPLAY_SIZE[0] / 2.0  # MIDDLE OF CART
+        carty = 100  # TOP OF CART
+        p0 = (cartx, carty)
+        alpha = self.theta_threshold_radians
+        p1 = (cartx + sin(alpha) * scale/2, carty + axleoffset + cos(alpha) * scale/2)
+        p2 = (cartx + sin(-alpha) * scale/2, carty + axleoffset + cos(-alpha) * scale/2)
+        gfxdraw.filled_polygon(self.surf, (p0, p1, p2), stat.LIGHT_GREEN)
+        self.display.blit(self.surf, (0, 0))
+
 
 
 
