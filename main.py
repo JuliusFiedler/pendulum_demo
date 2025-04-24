@@ -3,7 +3,6 @@ import sys
 import time
 import random
 import numpy as np
-from ipydex import IPS
 
 pygame.init()
 
