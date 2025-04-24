@@ -19,13 +19,10 @@ game_display = pygame.display.set_mode((stat.DISPLAY_SIZE))
 # init stuff
 clock = pygame.time.Clock()
 
-balance_highscore_path = "balance_highscore.json"
-swingup_highscore_path = "swingup_highscore.json"
-
 # loops
-hs_loop = HighscoreLoop(game_display, clock, balance_highscore_path, swingup_highscore_path)
-balance_loop = BalanceLoop(game_display, clock, highscore_path=balance_highscore_path)
-swingup_loop = SwingupLoop(game_display, clock, highscore_path=swingup_highscore_path)
+hs_loop = HighscoreLoop(game_display, clock, stat.balance_highscore_path, stat.swingup_highscore_path)
+balance_loop = BalanceLoop(game_display, clock, highscore_path=stat.balance_highscore_path)
+swingup_loop = SwingupLoop(game_display, clock, highscore_path=stat.swingup_highscore_path)
 exp_loop = ExperimentalLoop(game_display, clock)
 intro_loop = IntroLoop(game_display, clock, loops=[balance_loop, swingup_loop, hs_loop, exp_loop])
 

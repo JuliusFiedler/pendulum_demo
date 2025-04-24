@@ -2,6 +2,7 @@ from abc import abstractmethod
 import pygame
 from pygame import gfxdraw
 import numpy as np
+from numpy import sin, cos
 import math
 import sys, os
 from scipy.integrate import solve_ivp
@@ -35,31 +36,24 @@ class IntroLoop(Loop):
     def __init__(self, game_display, clock, loops:list) -> None:
         super().__init__(game_display, clock)
         self.loops = loops
-        from_border_x = 150
         from_border_y = 250
-        self.button_1_size = self.button_2_size = (400, 50)
-        self.button_1_pos = (from_border_x, stat.DISPLAY_SIZE[1] - from_border_y)
-        self.button_2_pos = (stat.DISPLAY_SIZE[0] - from_border_x-self.button_2_size[0], stat.DISPLAY_SIZE[1] - from_border_y)
-
-
+        self.b_size = (400, 50)
+        self.b_pos = (stat.DISPLAY_SIZE[0]//2-self.b_size[0]//2, stat.DISPLAY_SIZE[1] - from_border_y)
 
 
     def run(self):
-        b_stabilize = u.Button(self.display, self.button_1_pos[0], self.button_1_pos[1], self.button_1_size[0], self.button_1_size[1], \
+        b_stabilize = u.Button(self.display, self.b_pos[0], self.b_pos[1], self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Balancieren", stat.BUTTON_FONT, action=self.loops[0].run)
-        b_multi = u.Button(self.display, self.button_1_pos[0], self.button_1_pos[1]+self.button_1_size[1]+5, self.button_1_size[0], self.button_1_size[1], \
+        b_multi = u.Button(self.display, self.b_pos[0], self.b_pos[1]+self.b_size[1]+5, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Aufschwingen", stat.BUTTON_FONT, action=self.loops[1].run)
-        b_hs = u.Button(self.display, self.button_1_pos[0], self.button_1_pos[1]+(self.button_1_size[1]+5)*2, self.button_1_size[0], self.button_1_size[1], \
+        b_hs = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*2, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Highscore", stat.BUTTON_FONT, action=self.loops[2].run)
-        b_exp = u.Button(self.display, self.button_1_pos[0], self.button_1_pos[1]+(self.button_1_size[1]+5)*3, self.button_1_size[0], self.button_1_size[1], \
+        b_exp = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*3, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Experiment", stat.BUTTON_FONT, action=self.loops[3].run)
-        b2 = u.Button(self.display, self.button_2_pos[0], self.button_2_pos[1], self.button_2_size[0], self.button_2_size[1], \
-                stat.RED, stat.LIGHT_RED, "Exit", stat.BUTTON_FONT, action=u.exit_game)
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     sys.exit()
-
 
             self.display.fill(stat.WHITE)
 
@@ -73,11 +67,8 @@ class IntroLoop(Loop):
             b_multi.show()
             b_hs.show()
             b_exp.show()
-            # b2.show()
-
 
             pygame.display.update()
-
 
 class GameLoop(Loop):
     def __init__(self, game_display, clock, highscore_path) -> None:
@@ -87,7 +78,6 @@ class GameLoop(Loop):
         self.gravity = 9.8
         self.masscart = 1.0
         self.masspole = 0.1
-        self.total_mass = self.masspole + self.masscart
         self.tau = 0.01  # seconds between state updates
         self.kinematics_integrator = "solve_ivp"  # "euler"
 
@@ -99,14 +89,17 @@ class GameLoop(Loop):
         def back(obj):
             obj.exit = True
         self.return_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-70, 0, 70, 20, stat.RED, stat.LIGHT_RED, "Zurück", stat.NORMAL_FONT, action=back, action_args=[self])
-
+        self.arrow_img = pygame.transform.scale(pygame.image.load(stat.arrow_path), (75,50))
         self.init()
 
     def init(self):
+        self.success = False
+
         self.length = 1  # actually half the pole's length
         #! pole has length 2*l
-        self.polemass_length = self.masspole * self.length
-        self.F = 10
+        self.F = 7
+        self.my = 0.01 # friction
+
         self.next_action = 0
         self.t0 = time.time()
 
@@ -134,21 +127,36 @@ class GameLoop(Loop):
         # based on mathematical pendulum
 
         def rhs(t, state):
+            # x, x_dot, theta, theta_dot = state
+            # x1, x2, x3, x4 = x, theta, x_dot, theta_dot  # change order
+            # g = self.gravity
+            # l = self.length
+            # m1 = self.masscart
+            # m2 = self.masspole
+            # my = self.my
+            # u1 = action
+            # dx1_dt = x3
+            # dx2_dt = x4
+            # dx3_dt = (-g * m2 * np.sin(2 * x2) / 2 + l * m2 * theta_dot**2 * np.sin(x2) + u1) / (
+            #     m1 + m2 * np.sin(x2) ** 2
+            # )
+            # dx4_dt = (g * (m1 + m2) * np.sin(x2) - (l * m2 * theta_dot**2 * np.sin(x2) + u1) * np.cos(x2)) / (
+            #     l * (m1 + m2 * np.sin(x2) ** 2)
+            # )
             x, x_dot, theta, theta_dot = state
-            x1, x2, x3, x4 = x, theta, x_dot, theta_dot  # change order
+            x1, p1, x3, pdot1 = x, theta, x_dot, theta_dot  # change order
             g = self.gravity
             l = self.length
             m1 = self.masscart
             m2 = self.masspole
-            u1 = action
-            dx1_dt = x3
-            dx2_dt = x4
-            dx3_dt = (-g * m2 * np.sin(2 * x2) / 2 + l * m2 * theta_dot**2 * np.sin(x2) + u1) / (
-                m1 + m2 * np.sin(x2) ** 2
-            )
-            dx4_dt = (g * (m1 + m2) * np.sin(x2) - (l * m2 * theta_dot**2 * np.sin(x2) + u1) * np.cos(x2)) / (
-                l * (m1 + m2 * np.sin(x2) ** 2)
-            )
+            my = self.my
+            tau1 = action
+            dx1_dt = x_dot
+            dx2_dt = theta_dot
+            dx3_dt = (-2*g*m2*l*sin(p1)*cos(p1) + m2*pdot1**2*l**2*sin(p1) + 4*pdot1*my*cos(p1) + 2*l*tau1)/(2*m1*l + 2*m2*l*sin(p1)**2)
+
+            dx4_dt = (2*g*m1*m2*l*sin(p1) + 2*g*m2**2*l*sin(p1) - 4*m1*pdot1*my - m2**2*pdot1**2*l**2*sin(p1)*cos(p1) - 4*m2*pdot1*my - 2*m2*l*tau1*cos(p1))/(m1*m2*l**2 + m2**2*l**2*sin(p1)**2)
+
 
             return [dx1_dt, dx3_dt, dx2_dt, dx4_dt]  # change order back
 
@@ -177,8 +185,10 @@ class GameLoop(Loop):
         raise NotImplementedError()
 
     def reset(self):
-        self.times.append(time.time()- self.t0)
-        self.current_best = self.get_current_best()
+        if self.success:
+            self.times.append(time.time()- self.t0)
+            self.current_best = self.get_current_best()
+            self.success = False
 
         # random state
         self.state = self.get_start_state()
@@ -213,7 +223,7 @@ class GameLoop(Loop):
         world_width = self.x_threshold * 2
         scale = stat.DISPLAY_SIZE[0] / world_width
         polewidth = 10.0
-        polelen = scale * (2 * self.length)
+        polelen = scale * (self.length)
         cartwidth = 50.0
         cartheight = 30.0
 
@@ -263,6 +273,16 @@ class GameLoop(Loop):
             int(polewidth / 2),
             (129, 132, 203),
         )
+        # Center of Mass
+        com_x = cartx + sin(x[2]) * polelen/2
+        com_y = carty + axleoffset + cos(x[2]) * polelen/2
+        gfxdraw.filled_circle(
+            self.surf,
+            int(com_x),
+            int(com_y),
+            int(polewidth / 2),
+            (129, 132, 203),
+        )
 
         gfxdraw.hline(self.surf, 0, stat.DISPLAY_SIZE[0], carty, (0, 0, 0))
 
@@ -274,12 +294,12 @@ class GameLoop(Loop):
         coords = [(stat.DISPLAY_SIZE[0], carty+h_half), (stat.DISPLAY_SIZE[0], carty-h_half), (stat.DISPLAY_SIZE[0]-w, carty-h_half), (stat.DISPLAY_SIZE[0]-w, carty+h_half)]
         gfxdraw.filled_polygon(self.surf, coords, stat.RED)
 
-
         # show action
-        # if self.action == 0:
-        #     gfxdraw.filled_circle(self.surf, int(stat.DISPLAY_SIZE[0] / 2 - 10), 10, 10, (0, 0, 255))
-        # elif self.action == 1:
-        #     gfxdraw.filled_circle(self.surf, int(stat.DISPLAY_SIZE[0] / 2 + 10), 10, 10, (255, 0, 0))
+        arr_w, arr_h = self.arrow_img.get_size()
+        if self.action > 0:
+            self.surf.blit(self.arrow_img, (cartx + cartwidth//2, carty-cartheight+5))
+        if self.action < 0:
+            self.surf.blit(pygame.transform.flip(self.arrow_img, flip_x=True, flip_y=False), (cartx - cartwidth//2 - arr_w, carty-cartheight+5))
 
         # flip coordinates
         self.surf = pygame.transform.flip(self.surf, False, True)
@@ -400,6 +420,7 @@ class BalanceLoop(GameLoop):
             or theta < -self.theta_threshold_radians
             or theta > self.theta_threshold_radians
         )
+        self.success = True
         return terminated
 
     def get_highscore_and_position(self):
@@ -435,7 +456,8 @@ class ExperimentalLoop(GameLoop):
         # Angle at which to fail the episode
         self.theta_threshold_radians = 90 * 2 * math.pi / 360
         self.length_slider = u.Slider(game_display, 120, 10, 400, value=self.length, value_range=[0.1, 2])
-        self.force_slider = u.Slider(game_display, 120, 70, 400, value=self.F, value_range=[0.1, 20])
+        self.force_slider = u.Slider(game_display, 120, 70, 400, value=self.F, value_range=[0, 20])
+        self.friction_slider = u.Slider(game_display, 120, 130, 400, value=self.my, value_range=[0, 0.01], round_to=4)
         self.max_tries = 999
         self.reset_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 50, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Reset", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.reset, action_args=[])
         self.toggle_mode_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 90, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Aufschwingen", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.toggle_mode, action_args=[])
@@ -495,6 +517,10 @@ class ExperimentalLoop(GameLoop):
         self.F = self.force_slider.value
         self.force_slider.show()
 
+        # self.friction_slider.update(self.events)
+        # self.my = self.friction_slider.value
+        # self.friction_slider.show()
+
         self.reset_button.show()
         self.toggle_mode_button.show()
 
@@ -502,20 +528,30 @@ class SwingupLoop(GameLoop):
     def __init__(self, game_display, clock, highscore_path):
         super().__init__(game_display, clock, highscore_path)
         self.theta_threshold_radians = 10 * 2 * math.pi / 360
+        self.success = False
 
 
     def get_terminated(self):
-        return False
+        x, x_dot, theta, theta_dot = self.state
+        theta = theta % (2*np.pi)
+        self.success = bool(
+            theta < self.theta_threshold_radians
+            or 2*np.pi-theta < self.theta_threshold_radians
+        )
+        terminated = bool(
+            x < -self.x_threshold
+            or x > self.x_threshold
+            or self.success
+        )
+        return terminated
 
     def get_highscore_and_position(self):
         with open(self.highscore_path, "rt") as f:
             self.highscore_dict = json.load(f)
 
-        def sorting_function2(item):
-            return -item
         # bisect only works with ascending lists
-        position = bisect.bisect_right(np.array(sorted(self.highscore_dict.values(), key=sorting_function2), dtype=float)*-1, -self.current_best)
-        highscores = sorted(self.highscore_dict.items(), reverse=True, key=self.sorting_function)
+        position = bisect.bisect_right(sorted(self.highscore_dict.values()), self.current_best)
+        highscores = sorted(self.highscore_dict.items(), key=self.sorting_function)
         highscores.insert(position, ("", self.current_best))
 
         return highscores, position

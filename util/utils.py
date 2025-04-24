@@ -172,7 +172,7 @@ class InputBox:
         pygame.draw.rect(screen, self.color, self.rect, 2)
 
 class Slider:
-    def __init__(self, disp, x, y, w=50, h=20, value=0, value_range=[-1, 1]) -> None:
+    def __init__(self, disp, x, y, w=50, h=20, value=0, value_range=[-1, 1], round_to=2) -> None:
         self.disp = disp
         self.x = x
         self.y = y
@@ -185,23 +185,23 @@ class Slider:
         self.reset_button = Button(
             self.disp, self.x, self.y + self.h + 2, self.w, self.h, GRAY2, GRAY1, "reset", action=self.reset
         )
+        self.round_to = round_to
 
     def show(self):
         pygame.draw.rect(self.disp, BLACK, self.rect, width=2)
         pos = (
-            self.x + (self.value - self.initial_value) / (self.value_range[-1] - self.value_range[0]) * self.w + self.w / 2,
+            self.x + (self.value - self.value_range[0]) / (self.value_range[-1] - self.value_range[0]) * self.w, #+ self.w / 2,
             self.y + self.h / 2,
         )
         pygame.draw.circle(self.disp, color=BLUE, center=pos, radius=5)
         self.reset_button.show()
-        print_on_screen(self.disp, str(round(self.value, 2)), (self.x - 50, self.y))
+        print_on_screen(self.disp, str(round(self.value, self.round_to)), (self.x - 50, self.y))
 
     def update(self, event_list):
-        for event in event_list:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_pos = pygame.mouse.get_pos()
-                if self.rect.collidepoint(mouse_pos):
-                    self.value = self.initial_value + ((mouse_pos[0] - self.x) / self.w - 0.5) * (self.value_range[-1] - self.value_range[0])
+        if pygame.mouse.get_pressed()[0]:
+            mouse_pos = pygame.mouse.get_pos()
+            if self.rect.collidepoint(mouse_pos):
+                self.value = self.value_range[0] + ((mouse_pos[0] - self.x) / self.w) * (self.value_range[-1] - self.value_range[0])
 
     def reset(self):
         self.value = self.initial_value

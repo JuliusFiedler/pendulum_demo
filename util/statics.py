@@ -7,6 +7,11 @@ GAME_NAME = "Inverses Pendel"
 DISPLAY_SIZE = (1000, 800)
 FPS = 60
 
+# paths
+arrow_path = "img/arrow.png"
+balance_highscore_path = "balance_highscore.json"
+swingup_highscore_path = "swingup_highscore.json"
+
 # colors
 BLACK = 0, 0, 0
 WHITE = 255, 255, 255
