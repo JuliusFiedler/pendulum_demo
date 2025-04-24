@@ -88,7 +88,7 @@ class GameLoop(Loop):
 
         self.highscore_path = highscore_path
 
-        self.max_tries = 1
+        self.max_tries = 2
 
         self.x_threshold = 2.16
         def back(obj):
@@ -179,8 +179,8 @@ class GameLoop(Loop):
         action = self.next_action
         self.action = action
         if not self.countdown:
-            self.last_state = self.state
             self.state = self.calc_new_state(action)
+            self.last_state = self.state
         self.render()
 
         terminated = self.get_terminated()
@@ -197,6 +197,8 @@ class GameLoop(Loop):
             self.current_best = self.get_current_best()
             self.success = False
 
+        self.action = 0
+        self.next_action = 0
         # random state
         self.state = self.get_start_state()
         # self.state = [2.16, 0, 0, 0]
@@ -328,6 +330,7 @@ class GameLoop(Loop):
         u.print_on_screen(self.surf, f"aktuelle Bestzeit {cb} s", (10, 120))
         u.print_on_screen(self.surf, f"Highscore: {self.highscore}", (stat.DISPLAY_SIZE[0]-400, 40))
         u.print_on_screen(self.surf, f"Versuch: {self.number_of_tries+1}/{self.max_tries}", (stat.DISPLAY_SIZE[0]-400, 60))
+        u.print_on_screen(self.surf, f"Nutze die Pfeiltasten um den Wagen zu bewegen.", (10, 200), stat.MEDIUM_FONT)
         if self.countdown:
             n = 3-int(time.time() - self.countdown_start)
             if n >= 0:
@@ -458,6 +461,11 @@ class BalanceLoop(GameLoop):
         player = player_id.split("__")[-1]
         return f"{np.round(p_time, 1)} s, von {player}"
 
+    def _render_custom(self):
+        u.print_on_screen(self.surf, f"Halte das Pendel aufrecht. Du hast {self.max_tries} Versuche.", (10, 260), stat.MEDIUM_FONT)
+        self.display.blit(self.surf, (0, 0))
+
+
 class ExperimentalLoop(GameLoop):
     def __init__(self, game_display, clock):
         self.mode = 1 # 1=balance, -1 = swingup
@@ -583,6 +591,8 @@ class SwingupLoop(GameLoop):
         self._render_custom()
         self._render_cart()
         self._render_ui()
+        u.print_on_screen(self.surf, f"Richte das Pendel auf. Du hast {self.max_tries} Versuche.", (10, 260), stat.MEDIUM_FONT)
+        self.display.blit(self.surf, (0, 0))
         self._event_handling()
         self._render_post_pro()
 
