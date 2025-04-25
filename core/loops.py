@@ -10,6 +10,7 @@ import time
 from ipydex import IPS
 import json
 import bisect
+import csv
 
 import util.statics as stat
 import util.utils as u
@@ -36,7 +37,7 @@ class IntroLoop(Loop):
     def __init__(self, game_display, clock, loops:list) -> None:
         super().__init__(game_display, clock)
         self.loops = loops
-        from_border_y = 250
+        from_border_y = 300
         self.b_size = (400, 50)
         self.b_pos = (stat.DISPLAY_SIZE[0]//2-self.b_size[0]//2, stat.DISPLAY_SIZE[1] - from_border_y)
 
@@ -50,6 +51,8 @@ class IntroLoop(Loop):
                 stat.GREEN, stat.LIGHT_GREEN, "Highscore", stat.BUTTON_FONT, action=self.loops[2].run)
         b_exp = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*3, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Experiment", stat.BUTTON_FONT, action=self.loops[3].run)
+        b_control = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*4, self.b_size[0], self.b_size[1], \
+                stat.GREEN, stat.LIGHT_GREEN, "Regelung", stat.BUTTON_FONT, action=self.loops[4].run)
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -67,6 +70,7 @@ class IntroLoop(Loop):
             b_multi.show()
             b_hs.show()
             b_exp.show()
+            b_control.show()
 
             pygame.display.update()
 
@@ -85,6 +89,7 @@ class GameLoop(Loop):
         self.masspole = 0.1
         self.tau = 0.01  # seconds between state updates
         self.kinematics_integrator = "solve_ivp"  # "euler"
+        self.F_initial = 7
 
         self.highscore_path = highscore_path
 
@@ -100,9 +105,8 @@ class GameLoop(Loop):
     def init(self):
         self.success = False
 
-        self.length = 1  # actually half the pole's length
-        #! pole has length 2*l
-        self.F = 7
+        self.length = 1
+        self.F = self.F_initial
         self.my = 0.00 # friction
 
         self.next_action = 0
@@ -124,9 +128,8 @@ class GameLoop(Loop):
         self.times = []
         self.current_best = None
 
-    @abstractmethod
     def get_highscore(self):
-        raise NotImplementedError()
+        return ""
 
     def calc_new_state(self, action):
         x, x_dot, theta, theta_dot = self.state
@@ -159,8 +162,11 @@ class GameLoop(Loop):
         state = (x, x_dot, theta, theta_dot)
         return state
 
+    def get_action(self):
+        return self.next_action
+
     def step(self):
-        action = self.next_action
+        action = self.get_action()
         self.action = action
         if not self.countdown:
             self.state = self.calc_new_state(action)
@@ -198,9 +204,8 @@ class GameLoop(Loop):
     def get_start_state(self):
         raise NotImplementedError()
 
-    @abstractmethod
     def get_current_best(self):
-        raise NotImplementedError()
+        return None
 
     def render(self):
         self._render_init()
@@ -287,11 +292,17 @@ class GameLoop(Loop):
         gfxdraw.filled_polygon(self.surf, coords, stat.RED)
 
         # show action
-        arr_w, arr_h = self.arrow_img.get_size()
+        #todo transform size proportional to force
+        ratio = np.abs(self.action)/self.F_initial
+        ratio = np.max((0.1, ratio))
+        ratio = np.min((3, ratio))
+        img = pygame.transform.scale_by(self.arrow_img, ratio)
+        arr_w, arr_h = img.get_size()
+        y = carty - arr_h//2
         if self.action > 0:
-            self.surf.blit(self.arrow_img, (cartx + self.cartwidth//2, carty-self.cartheight+5))
+            self.surf.blit(img, (cartx + self.cartwidth//2, y))
         if self.action < 0:
-            self.surf.blit(pygame.transform.flip(self.arrow_img, flip_x=True, flip_y=False), (cartx - self.cartwidth//2 - arr_w, carty-self.cartheight+5))
+            self.surf.blit(pygame.transform.flip(img, flip_x=True, flip_y=False), (cartx - self.cartwidth//2 - arr_w, y))
 
         # flip coordinates
         self.surf = pygame.transform.flip(self.surf, False, True)
@@ -332,8 +343,7 @@ class GameLoop(Loop):
         # some event handling for interactivity
         for ev in self.events:
             if ev.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                u.exit_game()
             if not self.countdown:
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_LEFT:
@@ -363,9 +373,8 @@ class GameLoop(Loop):
             if pos <= 17:
                 self.enter_name_highscore(highscores=hs, position=pos)
 
-    @abstractmethod
     def get_highscore_and_position(self):
-        raise NotImplementedError()
+        return None, None
 
     def enter_name_highscore(self, highscores:list, position:int):
         """highscores is a list of tuples [("1235142561__bob", 1.5), ("1238713812__mob", 2.4)]"""
@@ -386,8 +395,7 @@ class GameLoop(Loop):
             for ev in pygame.event.get():
                 if ev.type == pygame.KEYDOWN:
                     if ev.type == pygame.QUIT:
-                        pygame.quit()
-                        sys.exit()
+                        u.exit_game()
                     if ev.key == pygame.K_RETURN or ev.key == pygame.K_KP_ENTER:
                         done = True
                         break
@@ -400,6 +408,145 @@ class GameLoop(Loop):
         self.highscore_dict[player_id] = self.current_best
         with open(self.highscore_path, "wt") as f:
             json.dump(self.highscore_dict, f)
+
+
+class ControlLoop(GameLoop):
+    def __init__(self, game_display, clock):
+        self.mode = 0
+        self.K_upper_EQ = np.array([[
+            -85.62691131,   # x
+            -54.33231397,    # x_dot
+            -178.12345566,  # theta
+            -40.16615698,   # theta_dot
+            ]])
+        # self.K_lower_EQ = np.array([[85.62691131499069, 54.332313965344916, 72.8765443425107, -14.166156982672117]])
+        self.K_lower_EQ = np.array([[31.622776601683597, 43.28803503081849, 125.73324499512717, 15.65939564338845]])
+
+        super().__init__(game_display, clock, None)
+        self.reset_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 50, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Reset", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.reset, action_args=[])
+        self.toggle_mode_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 90, 120, 30, stat.ORANGE, stat.LIGHT_ORANGE, "Aufschwingen", stat.NORMAL_FONT, text_color=stat.BLACK, action=self.toggle_mode, action_args=[])
+
+        self.swingup_actions = []
+        # load swingup trajectory
+        with open("trajectories/cartpole_swingup.csv", newline="") as csvfile:
+            reader = csv.reader(csvfile, delimiter=",")
+            for row in reader:
+                self.swingup_actions.append(row[0])
+        self.swingup_index = 0
+        self.save_actions = []
+        self.number_of_modes = 2
+
+    def toggle_mode(self):
+        self.mode += 1
+        self.mode = self.mode % self.number_of_modes
+        # button label opposite (what you click on is what you want)
+        if self.mode == 0:
+            self.toggle_mode_button.text = "Aufschwingen"
+            self.toggle_mode_button.inactive_color = stat.ORANGE
+            self.toggle_mode_button.active_color = stat.LIGHT_ORANGE
+        elif self.mode == 1:
+            self.toggle_mode_button.text = "Balance"
+            self.toggle_mode_button.inactive_color = stat.GREEN
+            self.toggle_mode_button.active_color = stat.GREEN
+        elif self.mode == 2:
+            self.toggle_mode_button.text = "Gen Traj"
+        self.reset()
+
+    def get_terminated(self):
+        x, x_dot, theta, theta_dot = self.state
+        terminated = bool(
+            x < -self.x_threshold
+            or x > self.x_threshold
+        )
+        if self.mode == 2:
+            if np.abs(self.state[2] - np.pi) < 0.01 and np.abs(self.state[0]) < 0.1:
+                terminated = True
+        return terminated
+
+    def get_action(self):
+        if self.mode == 0:
+            action = -(self.K_upper_EQ @ self.state)[0]
+        elif self.mode == 1:
+            if self.swingup_index < len(self.swingup_actions):
+                action = float(self.swingup_actions[self.swingup_index])
+                self.swingup_index += 1
+            else:
+                self.mode = 0
+                self.toggle_mode_button.text = "Aufschwingen"
+                self.toggle_mode_button.inactive_color = stat.ORANGE
+                self.toggle_mode_button.active_color = stat.LIGHT_ORANGE
+                action = 0
+
+        elif self.mode == 2:
+            if np.abs(self.state[2]) < 0.4:
+                action = -50
+            else:
+                state = np.array(self.state, dtype=float)
+                state[2] += np.pi
+                state = u.project_to_interval(state)
+                action = -(self.K_lower_EQ @ state)[0]
+            self.save_actions.append(action)
+        action = np.clip(action, -50, 50)
+        return action
+
+    def get_start_state(self):
+        if self.mode == 0:
+            return [0, 0, (np.random.random()-0.5)*0.1, 0]
+        elif self.mode == 1:
+            return [0, 0, np.pi, 0]
+        elif self.mode == 2:
+            return [0, 0, 0, 0]
+
+    def reset(self):
+        self.action = 0
+        # random state
+        self.state = self.get_start_state()
+        self.swingup_index = 0
+        if self.mode == 2:
+            self.save_actions.reverse()
+            with open("trajectories/cartpole_swingup.csv", mode="w", newline="") as csvfile:
+                writer = csv.writer(csvfile, delimiter=",")
+                for a in self.save_actions:
+                    writer.writerow([str(a)])
+            self.save_actions = []
+
+
+    def _render_ui(self):
+        self.countdown = False
+        u.print_on_screen(self.surf, f"Nutze die Pfeiltasten um das Pendel zu schubsen.", (10, 200), stat.MEDIUM_FONT)
+        self.display.blit(self.surf, (0,0))
+
+    def _event_handling(self):
+        pygame.event.pump()
+        world_width = self.x_threshold * 2
+        scale = stat.DISPLAY_SIZE[0] / world_width
+
+
+        # some event handling for interactivity
+        push_angle = 10.0 / 180 * np.pi
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                u.exit_game()
+            if ev.type == pygame.KEYDOWN:
+                # push rod to make cart do something
+                if ev.key == pygame.K_LEFT:
+                    state = list(self.state)
+                    state[2] -= push_angle
+                    self.state = state
+                if ev.key == pygame.K_RIGHT:
+                    state = list(self.state)
+                    state[2] += push_angle
+                    self.state = state
+            if ev.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                # print(mouse_pos)
+                if mouse_pos[1] > 300:
+                    target_x = -(stat.DISPLAY_SIZE[0] / 2 - mouse_pos[0]) / scale
+                    self.target_offset = target_x
+
+    def _render_custom(self):
+        self.reset_button.show()
+        self.toggle_mode_button.show()
 
 
 class BalanceLoop(GameLoop):
@@ -510,6 +657,7 @@ class ExperimentalLoop(GameLoop):
         u.print_on_screen(self.display, f"Länge", (10, 10), stat.NORMAL_FONT)
         u.print_on_screen(self.display, f"Kraft", (10, 70), stat.NORMAL_FONT)
         u.print_on_screen(self.display, f"Reibung", (10, 130), stat.NORMAL_FONT)
+        u.print_on_screen(self.display, f"im Gelenk", (10, 150), stat.NORMAL_FONT)
 
     def _render_custom(self):
         self.length_slider.update(self.events)
@@ -638,8 +786,7 @@ class HighscoreLoop(Loop):
 
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
+                    u.exit_game()
             self.return_button.show()
             self.clock.tick(stat.FPS)
             pygame.display.flip()

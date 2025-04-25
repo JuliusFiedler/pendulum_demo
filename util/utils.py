@@ -205,3 +205,36 @@ class Slider:
 
     def reset(self):
         self.value = self.initial_value
+
+def project_to_interval(state, min=-np.pi, max=np.pi):
+    """map the state to the given interval, specifically map theta to [-pi, pi]"""
+    assert abs(min) + abs(max) == 2 * np.pi, "interval is not of size 2*pi"
+    if hasattr(state, "shape") and len(state.shape) == 2:
+        angle = state[:, 2]
+        angle = angle % (2 * np.pi)
+        angle[np.argwhere(angle < min)] += np.pi * 2
+        angle[np.argwhere(angle > max)] -= np.pi * 2
+        state[:, 2] = angle
+
+    else:
+        if isinstance(state, (np.ndarray, list, tuple)):
+            state = np.array(state, dtype=float)
+            angle = state[2]
+        else:
+            angle = state
+
+        angle = angle % (2 * np.pi)
+        if angle < min:
+            angle += np.pi * 2
+        elif angle > max:
+            angle -= np.pi * 2
+
+        assert min <= angle
+        assert angle <= max
+
+        if isinstance(state, np.ndarray):
+            state[2] = angle
+        else:
+            state = angle
+
+    return state
