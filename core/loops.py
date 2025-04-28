@@ -93,7 +93,7 @@ class GameLoop(Loop):
 
         self.highscore_path = highscore_path
 
-        self.max_tries = 2
+        self.max_tries = 2 #! number of tries before returning to start screen. 2 for testing, ~10 for deployment
 
         self.x_threshold = 2.16
         def back(obj):
@@ -434,7 +434,7 @@ class ControlLoop(GameLoop):
                 self.swingup_actions.append(row[0])
         self.swingup_index = 0
         self.save_actions = []
-        self.number_of_modes = 2
+        self.number_of_modes = 2 # set this to 3 to record swing down -> time reversal -> swingup trajectory
 
     def toggle_mode(self):
         self.mode += 1
