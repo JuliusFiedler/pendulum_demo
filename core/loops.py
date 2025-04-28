@@ -513,6 +513,7 @@ class ControlLoop(GameLoop):
 
     def _render_ui(self):
         self.countdown = False
+        u.print_on_screen(self.surf, f"Modus wechseln ->", (500, 83), stat.MEDIUM_FONT)
         u.print_on_screen(self.surf, f"Nutze die Pfeiltasten um das Pendel zu schubsen.", (10, 200), stat.MEDIUM_FONT)
         self.display.blit(self.surf, (0,0))
 

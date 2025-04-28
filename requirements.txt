@@ -2,4 +2,3 @@ pygame
 ipydex
 numpy
 scipy
-pyinstaller
