@@ -100,6 +100,7 @@ class GameLoop(Loop):
             obj.exit = True
         self.return_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-70, 0, 70, 20, stat.RED, stat.LIGHT_RED, "Zurück", stat.NORMAL_FONT, action=back, action_args=[self])
         self.arrow_img = pygame.transform.scale(pygame.image.load(stat.arrow_path), (75,50))
+        self.arrow_green_img = pygame.transform.scale(pygame.image.load(stat.arrow_green_path), (75,50))
         self.init()
 
     def init(self):
@@ -465,13 +466,14 @@ class ControlLoop(GameLoop):
 
     def get_action(self):
         if self.mode == 0:
-            action = -(self.K_upper_EQ @ self.state)[0]
+            action = -(self.K_upper_EQ @ (self.state - np.array([self.target_offset, 0,0,0])))[0]
         elif self.mode == 1:
             if self.swingup_index < len(self.swingup_actions):
                 action = float(self.swingup_actions[self.swingup_index])
                 self.swingup_index += 1
             else:
                 self.mode = 0
+                self.target_offset = 0
                 self.toggle_mode_button.text = "Aufschwingen"
                 self.toggle_mode_button.inactive_color = stat.ORANGE
                 self.toggle_mode_button.active_color = stat.LIGHT_ORANGE
@@ -502,6 +504,7 @@ class ControlLoop(GameLoop):
         # random state
         self.state = self.get_start_state()
         self.swingup_index = 0
+        self.target_offset = 0
         if self.mode == 2:
             self.save_actions.reverse()
             with open("trajectories/cartpole_swingup.csv", mode="w", newline="") as csvfile:
@@ -515,6 +518,15 @@ class ControlLoop(GameLoop):
         self.countdown = False
         u.print_on_screen(self.surf, f"Modus wechseln ->", (500, 83), stat.MEDIUM_FONT)
         u.print_on_screen(self.surf, f"Nutze die Pfeiltasten um das Pendel zu schubsen.", (10, 200), stat.MEDIUM_FONT)
+        u.print_on_screen(self.surf, f"Bestimme die Zielposition mit Klicken der Maus.", (10, 250), stat.MEDIUM_FONT)
+        if self.mode == 0:
+            scale = stat.DISPLAY_SIZE[0] / (self.x_threshold * 2)
+            img = self.arrow_green_img
+            img = pygame.transform.scale_by(img, 0.8)
+            img = pygame.transform.rotate(img, 90)
+
+            self.surf.blit(img, (int(stat.DISPLAY_SIZE[0]//2 + self.target_offset*scale)-img.get_size()[0]//2, int(stat.DISPLAY_SIZE[1]-80)))
+
         self.display.blit(self.surf, (0,0))
 
     def _event_handling(self):
