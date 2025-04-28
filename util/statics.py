@@ -9,8 +9,8 @@ FPS = 60
 
 # paths
 arrow_path = "img/arrow.png"
-balance_highscore_path = "balance_highscore.json"
-swingup_highscore_path = "swingup_highscore.json"
+balance_highscore_path = "data/balance_highscore.json"
+swingup_highscore_path = "data/swingup_highscore.json"
 
 # colors
 BLACK = 0, 0, 0
