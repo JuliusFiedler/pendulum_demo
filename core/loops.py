@@ -101,6 +101,9 @@ class GameLoop(Loop):
         self.return_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-70, 0, 70, 20, stat.RED, stat.LIGHT_RED, "Zurück", stat.NORMAL_FONT, action=back, action_args=[self])
         self.arrow_img = pygame.transform.scale(pygame.image.load(stat.arrow_path), (75,50))
         self.arrow_green_img = pygame.transform.scale(pygame.image.load(stat.arrow_green_path), (75,50))
+
+        self.joysticks = {}
+
         self.init()
 
     def init(self):
@@ -345,6 +348,21 @@ class GameLoop(Loop):
         for ev in self.events:
             if ev.type == pygame.QUIT:
                 u.exit_game()
+
+            # Handle hotplugging
+            if ev.type == pygame.JOYDEVICEADDED:
+                # This event will be generated when the program starts for every
+                # joystick, filling up the list without needing to create them manually.
+                joy = pygame.joystick.Joystick(ev.device_index)
+                self.joysticks[joy.get_instance_id()] = joy
+                print(f"Joystick {joy.get_instance_id()} connencted")
+
+            if ev.type == pygame.JOYDEVICEREMOVED:
+                try:
+                    del self.joysticks[ev.instance_id]
+                except KeyError:
+                    pass
+                print(f"Joystick {ev.instance_id} disconnected")
             if not self.countdown:
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_LEFT:
@@ -356,6 +374,12 @@ class GameLoop(Loop):
                         self.next_action = 0
                     if ev.key == pygame.K_RIGHT:
                         self.next_action = 0
+
+                if ev.type == pygame.JOYAXISMOTION:
+                    if ev.axis == 0:
+                        self.next_action = 2*self.F * ev.value
+
+
 
     def _render_post_pro(self):
         self.return_button.show()
