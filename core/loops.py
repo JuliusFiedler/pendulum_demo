@@ -108,7 +108,7 @@ class GameLoop(Loop):
 
         self.max_tries = 2 #! number of tries before returning to start screen. 2 for testing, ~10 for deployment
 
-        self.x_threshold = 2.16
+        self.x_threshold = 2.16/1000*stat.DISPLAY_SIZE[0] #2.16 this number results in nice ratios on screen
         def back(obj):
             obj.exit = True
         self.return_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-70, 0, 70, 20, stat.RED, stat.LIGHT_RED, "Zurück", stat.NORMAL_FONT, action=back, action_args=[self])
@@ -652,6 +652,7 @@ class BalanceLoop(GameLoop):
 class ExperimentalLoop(GameLoop):
     def __init__(self, game_display, clock):
         self.mode = 1 # 1=balance, -1 = swingup
+        self.endless_mode = -1 # 1 endless, -1 reset on pendulum fall
         super().__init__(game_display, clock, None)
         # Angle at which to fail the episode
         self.theta_threshold_radians = 90 * 2 * math.pi / 360
@@ -660,8 +661,12 @@ class ExperimentalLoop(GameLoop):
         self.force_slider = u.Slider(game_display, x_pos_sliders, 70, 400, value=self.F, value_range=[0, 20])
         self.friction_slider = u.Slider(game_display, x_pos_sliders, 130, 400, value=self.my, value_range=[0, 0.1], round_to=4)
         self.max_tries = 999
-        self.reset_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 50, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Reset", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.reset, action_args=[])
-        self.toggle_mode_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 90, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Aufschwingen", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.toggle_mode, action_args=[])
+        self.reset_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 50, 120, 30, stat.BLUE, stat.LIGHT_BLUE, \
+            "Reset", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.reset, action_args=[])
+        self.toggle_mode_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 90, 120, 30, stat.BLUE, \
+            stat.LIGHT_BLUE, "Aufschwingen", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.toggle_mode, action_args=[])
+        self.toggle_endless_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 130, 120, 30, stat.BLUE, \
+            stat.LIGHT_BLUE, "Endlos", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.toggle_endless_mode, action_args=[])
 
     def get_terminated(self):
         x, x_dot, theta, theta_dot = self.state
@@ -671,12 +676,18 @@ class ExperimentalLoop(GameLoop):
                 or x > self.x_threshold
             )
         elif self.mode == 1:
-            terminated = bool(
-                x < -self.x_threshold
-                or x > self.x_threshold
-                or theta < -self.theta_threshold_radians
-                or theta > self.theta_threshold_radians
-            )
+            if self.endless_mode == 1:
+                terminated = bool(
+                    x < -self.x_threshold
+                    or x > self.x_threshold
+                )
+            elif self.endless_mode == -1:
+                terminated = bool(
+                    x < -self.x_threshold
+                    or x > self.x_threshold
+                    or theta < -self.theta_threshold_radians
+                    or theta > self.theta_threshold_radians
+                )
 
         return terminated
 
@@ -687,6 +698,17 @@ class ExperimentalLoop(GameLoop):
             self.toggle_mode_button.text = "Balance"
         elif self.mode == 1:
             self.toggle_mode_button.text = "Aufschwingen"
+        self.reset()
+
+    def toggle_endless_mode(self):
+        self.endless_mode *= -1
+        # button label opposite (what you click on is what you want)
+        if self.endless_mode == -1:
+            self.toggle_endless_button.inactive_color = stat.BLUE
+            self.toggle_endless_button.active_color = stat.LIGHT_BLUE
+        elif self.endless_mode == 1:
+            self.toggle_endless_button.inactive_color = stat.LIGHT_BLUE
+            self.toggle_endless_button.active_color = stat.BLUE
         self.reset()
 
     def get_highscore_and_position(self):
@@ -726,6 +748,7 @@ class ExperimentalLoop(GameLoop):
 
         self.reset_button.show()
         self.toggle_mode_button.show()
+        self.toggle_endless_button.show()
 
 class SwingupLoop(GameLoop):
     def __init__(self, game_display, clock, highscore_path):
