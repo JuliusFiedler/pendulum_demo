@@ -26,6 +26,8 @@ class Loop():
         self.clock.tick(stat.FPS)
         self.row_template = "{:<2}.  {:<5} s,   {}"
 
+        self.joysticks = {}
+
     @abstractmethod
     def run(self):
         pass
@@ -58,6 +60,17 @@ class IntroLoop(Loop):
                 if event.type == pygame.QUIT:
                     sys.exit()
 
+                # Handle hotplugging
+                if event.type == pygame.JOYDEVICEADDED:
+                    # This event will be generated when the program starts for every
+                    # joystick, filling up the list without needing to create them manually.
+                    joy = pygame.joystick.Joystick(event.device_index)
+                    self.joysticks[joy.get_instance_id()] = joy
+                    print(f"Joystick {joy.get_instance_id()} connected")
+
+                if event.type == pygame.JOYDEVICEREMOVED:
+                    del self.joysticks[event.instance_id]
+                    print(f"Joystick {event.instance_id} disconnected")
             self.display.fill(stat.WHITE)
 
             text_surface, text_rect = u.text_objects(stat.GAME_NAME, stat.LARGE_FONT)
@@ -102,7 +115,6 @@ class GameLoop(Loop):
         self.arrow_img = pygame.transform.scale(pygame.image.load(stat.arrow_path), (75,50))
         self.arrow_green_img = pygame.transform.scale(pygame.image.load(stat.arrow_green_path), (75,50))
 
-        self.joysticks = {}
 
         self.init()
 
@@ -341,7 +353,6 @@ class GameLoop(Loop):
         self.display.blit(self.surf, (0, 0))
 
     def _event_handling(self):
-        pygame.event.pump()
         self.events = pygame.event.get()
 
         # some event handling for interactivity
@@ -355,7 +366,7 @@ class GameLoop(Loop):
                 # joystick, filling up the list without needing to create them manually.
                 joy = pygame.joystick.Joystick(ev.device_index)
                 self.joysticks[joy.get_instance_id()] = joy
-                print(f"Joystick {joy.get_instance_id()} connencted")
+                print(f"Joystick {joy.get_instance_id()} connected", flush=True)
 
             if ev.type == pygame.JOYDEVICEREMOVED:
                 try:
@@ -378,6 +389,10 @@ class GameLoop(Loop):
                 if ev.type == pygame.JOYAXISMOTION:
                     if ev.axis == 0:
                         self.next_action = 2*self.F * ev.value
+
+                if ev.type == pygame.JOYBUTTONDOWN:
+                    if ev.button == 1:
+                        self.reset()
 
 
 
