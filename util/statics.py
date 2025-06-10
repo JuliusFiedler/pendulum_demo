@@ -4,7 +4,7 @@ import pygame
 GAME_NAME = "Inverses Pendel"
 
 # Display
-DISPLAY_SIZE = (1000, 800)
+DISPLAY_SIZE = (1500, 800)
 FPS = 60
 
 # paths
@@ -20,7 +20,7 @@ RED = 200, 0, 0
 LIGHT_RED = 255, 0, 0
 GREEN = 0, 200, 0
 LIGHT_GREEN = 0, 255, 0
-BLUE = 0, 0, 200
+BLUE = 0, 0, 150
 LIGHT_BLUE = 0, 0, 255
 ORANGE = 200, 102, 0
 LIGHT_ORANGE = 255, 102, 0
