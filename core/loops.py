@@ -15,7 +15,9 @@ import csv
 import util.statics as stat
 import util.utils as u
 
-
+def exit_proxy():
+    pygame.quit()
+    sys.exit()
 
 
 class Loop():
@@ -39,7 +41,7 @@ class IntroLoop(Loop):
     def __init__(self, game_display, clock, loops:list) -> None:
         super().__init__(game_display, clock)
         self.loops = loops
-        from_border_y = 300
+        from_border_y = 400
         self.b_size = (400, 50)
         self.b_pos = (stat.DISPLAY_SIZE[0]//2-self.b_size[0]//2, stat.DISPLAY_SIZE[1] - from_border_y)
 
@@ -55,6 +57,8 @@ class IntroLoop(Loop):
                 stat.GREEN, stat.LIGHT_GREEN, "Experiment", stat.BUTTON_FONT, action=self.loops[3].run)
         b_control = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*4, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Regelung", stat.BUTTON_FONT, action=self.loops[4].run)
+        b_exit = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*5, self.b_size[0], self.b_size[1], \
+                stat.GREEN, stat.LIGHT_GREEN, "Beenden", stat.BUTTON_FONT, action=exit_proxy)
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -84,6 +88,7 @@ class IntroLoop(Loop):
             b_hs.show()
             b_exp.show()
             b_control.show()
+            b_exit.show()
 
             pygame.display.update()
 

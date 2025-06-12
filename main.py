@@ -1,8 +1,8 @@
 import pygame
-import sys
-import time
-import random
-import numpy as np
+# import sys
+# import time
+# import random
+# import numpy as np
 
 pygame.init()
 
@@ -10,10 +10,10 @@ import util.statics as stat
 import util.utils as u
 from core.loops import HighscoreLoop, BalanceLoop, IntroLoop, SwingupLoop, ExperimentalLoop, ControlLoop
 
-
 # display
 pygame.display.set_caption(stat.GAME_NAME)
-game_display = pygame.display.set_mode((stat.DISPLAY_SIZE))
+display_flags = pygame.FULLSCREEN
+game_display = pygame.display.set_mode(size=(stat.DISPLAY_SIZE), flags=display_flags)
 
 # init stuff
 clock = pygame.time.Clock()

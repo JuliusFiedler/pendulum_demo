@@ -4,7 +4,10 @@ import pygame
 GAME_NAME = "Inverses Pendel"
 
 # Display
-DISPLAY_SIZE = (1500, 800)
+# DISPLAY_SIZE = (1500, 800)
+# assume a present display with 24-bit-depth and select highest possible resolution
+modes = pygame.display.list_modes(24)
+DISPLAY_SIZE = modes[0]
 FPS = 60
 
 # paths
