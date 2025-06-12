@@ -57,6 +57,24 @@ class Button():
         text_rect.center = (button_pos[0] + button_size[0]/2, button_pos[1] + button_size[1]/2)
         self.disp.blit(text_surface, text_rect)
 
+class ToggleButton(Button):
+    def __init__(self, disp, x, y, w, h, unactivated_inactive_color, unactivated_active_color, activated_inactive_color, activated_active_color, text, font=NORMAL_FONT, text_color=BLACK) -> None:
+        super().__init__(disp, x, y, w, h, unactivated_inactive_color, unactivated_active_color, text, font, text_color, self.toggle)
+        self.active = False
+        self.unactivated_inactive_color = unactivated_inactive_color
+        self.unactivated_active_color = unactivated_active_color
+        self.activated_inactive_color = activated_inactive_color
+        self.activated_active_color = activated_active_color
+        
+    def toggle(self):
+        self.active = not self.active
+        self.active_color = self.activated_active_color if self.active else self.unactivated_active_color
+        self.inactive_color = self.activated_inactive_color if self.active else self.unactivated_inactive_color
+
+    def get_active(self):
+        return self.active
+        
+
 def text_to_screen(surf, text, pos, font=None, fontsize=16, color=None, rotation=0, return_rect=False):
     if font is None:
         font = pygame.font.Font("freesansbold.ttf", fontsize)

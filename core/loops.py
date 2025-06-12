@@ -47,6 +47,9 @@ class IntroLoop(Loop):
 
 
     def run(self):
+        global tb_joyaxis  # Weder gut noch schön, aber gar keine Motivation den Status des ToggleButton durch *alle* Funktionsaufrufe zu ziehen
+        tb_joyaxis = u.ToggleButton(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*5, self.b_size[0], self.b_size[1], \
+                stat.RED, stat.LIGHT_RED, stat.GREEN, stat.LIGHT_GREEN, "Gamepad-Eingabe", stat.BUTTON_FONT)
         b_stabilize = u.Button(self.display, self.b_pos[0], self.b_pos[1], self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Balancieren", stat.BUTTON_FONT, action=self.loops[0].run)
         b_multi = u.Button(self.display, self.b_pos[0], self.b_pos[1]+self.b_size[1]+5, self.b_size[0], self.b_size[1], \
@@ -54,10 +57,10 @@ class IntroLoop(Loop):
         b_hs = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*2, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Highscore", stat.BUTTON_FONT, action=self.loops[2].run)
         b_exp = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*3, self.b_size[0], self.b_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Experiment", stat.BUTTON_FONT, action=self.loops[3].run)
+                stat.GREEN, stat.LIGHT_GREEN, "Experiment", stat.BUTTON_FONT, action=self.loops[3].run, action_args=[])
         b_control = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*4, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Regelung", stat.BUTTON_FONT, action=self.loops[4].run)
-        b_exit = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*5, self.b_size[0], self.b_size[1], \
+        b_exit = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*6, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Beenden", stat.BUTTON_FONT, action=exit_proxy)
         while True:
             for event in pygame.event.get():
@@ -88,6 +91,7 @@ class IntroLoop(Loop):
             b_hs.show()
             b_exp.show()
             b_control.show()
+            tb_joyaxis.show()
             b_exit.show()
 
             pygame.display.update()
@@ -359,6 +363,7 @@ class GameLoop(Loop):
 
     def _event_handling(self):
         self.events = pygame.event.get()
+        use_joyaxis = tb_joyaxis.get_active()
 
         # some event handling for interactivity
         for ev in self.events:
@@ -391,13 +396,14 @@ class GameLoop(Loop):
                     if ev.key == pygame.K_RIGHT:
                         self.next_action = 0
 
-                if ev.type == pygame.JOYAXISMOTION:
-                    if ev.axis == 0:
-                        self.next_action = 2*self.F * ev.value
+                if use_joyaxis:
+                    if ev.type == pygame.JOYAXISMOTION:
+                        if ev.axis == 0:
+                            self.next_action = 2*self.F * ev.value
 
-                if ev.type == pygame.JOYBUTTONDOWN:
-                    if ev.button == 1:
-                        self.reset()
+                    if ev.type == pygame.JOYBUTTONDOWN:
+                        if ev.button == 1:
+                            self.reset()
 
 
 
