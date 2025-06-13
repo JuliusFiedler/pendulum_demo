@@ -765,16 +765,17 @@ class SwingupLoop(GameLoop):
     def __init__(self, game_display, clock, highscore_path):
         super().__init__(game_display, clock, highscore_path)
         self.theta_threshold_radians = 5 * 2 * math.pi / 360
+        self.theta_dot_threshold = self.theta_threshold_radians
         self.success = False
 
 
     def get_terminated(self):
         x, x_dot, theta, theta_dot = self.state
         theta = theta % (2*np.pi)
-        self.success = bool(
+        self.success = bool(  # position check
             theta < self.theta_threshold_radians
             or 2*np.pi-theta < self.theta_threshold_radians
-        )
+        ) and (abs(theta_dot) < self.theta_dot_threshold)  # speed check
         terminated = bool(
             x < -self.x_threshold
             or x > self.x_threshold
