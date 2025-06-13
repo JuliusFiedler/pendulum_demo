@@ -651,9 +651,14 @@ class BalanceLoop(GameLoop):
     def get_highscore(self):
         with open(self.highscore_path, "rt") as f:
             self.highscore_dict = json.load(f)
-        player_id, p_time = sorted(self.highscore_dict.items(), key=self.sorting_function, reverse=True)[0]
-        player = player_id.split("__")[-1]
-        return f"{np.round(p_time, 1)} s, von {player}"
+        res = sorted(self.highscore_dict.items(), key=self.sorting_function, reverse=True)
+        if res:
+            player_id, p_time = [0]
+            player = player_id.split("__")[-1]
+            output = f"{np.round(p_time, 1)} s, von {player}"
+        else:
+            output = ""
+        return output
 
     def _render_custom(self):
         u.print_on_screen(self.surf, f"Halte das Pendel aufrecht. Du hast {self.max_tries} Versuche.", (10, 260), stat.MEDIUM_FONT)
@@ -802,9 +807,14 @@ class SwingupLoop(GameLoop):
     def get_highscore(self):
         with open(self.highscore_path, "rt") as f:
             self.highscore_dict = json.load(f)
-        player_id, p_time = sorted(self.highscore_dict.items(), key=self.sorting_function)[0]
-        player = player_id.split("__")[-1]
-        return f"{np.round(p_time, 1)} s, von {player}"
+        res = sorted(self.highscore_dict.items(), key=self.sorting_function)
+        if res:
+            player_id, p_time = res[0]
+            player = player_id.split("__")[-1]
+            output = f"{np.round(p_time, 1)} s, von {player}"
+        else:
+            output = ""
+        return output
 
     def render(self):
         self._render_init()

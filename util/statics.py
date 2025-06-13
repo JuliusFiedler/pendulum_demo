@@ -1,4 +1,5 @@
 import pygame
+import os
 
 # Organization
 GAME_NAME = "Inverses Pendel"
@@ -15,6 +16,11 @@ arrow_path = "img/arrow.png"
 arrow_green_path = "img/arrow_green.png"
 balance_highscore_path = "data/balance_highscore.json"
 swingup_highscore_path = "data/swingup_highscore.json"
+for path in [balance_highscore_path, swingup_highscore_path]:
+    if not os.path.exists(path):
+        os.makedirs(os.path.split(path)[0], exist_ok=True)
+        with open(path, "wt") as f:
+            f.write("{}")
 
 # colors
 BLACK = 0, 0, 0
