@@ -44,6 +44,8 @@ class IntroLoop(Loop):
         from_border_y = 400
         self.b_size = (400, 50)
         self.b_pos = (stat.DISPLAY_SIZE[0]//2-self.b_size[0]//2, stat.DISPLAY_SIZE[1] - from_border_y)
+        self.rst_logo = pygame.transform.scale_by(pygame.image.load(stat.rst_logo_path), 0.2)
+        self.logo_pos = (stat.DISPLAY_SIZE[0]//2-self.rst_logo.get_rect().width//2, stat.DISPLAY_SIZE[1] //2)
 
 
     def run(self):
@@ -83,7 +85,7 @@ class IntroLoop(Loop):
             text_surface, text_rect = u.text_objects(stat.GAME_NAME, stat.LARGE_FONT)
             text_rect.center = (stat.DISPLAY_SIZE[0] / 2, stat.DISPLAY_SIZE[1] / 3)
             self.display.blit(text_surface, text_rect)
-
+            self.display.blit(self.rst_logo, self.logo_pos)
 
             # buttons
             b_stabilize.show()

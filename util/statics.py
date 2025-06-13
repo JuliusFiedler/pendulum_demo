@@ -14,6 +14,7 @@ FPS = 60
 # paths
 arrow_path = "img/arrow.png"
 arrow_green_path = "img/arrow_green.png"
+rst_logo_path = "img/rst-logo.png"
 balance_highscore_path = "data/balance_highscore.json"
 swingup_highscore_path = "data/swingup_highscore.json"
 for path in [balance_highscore_path, swingup_highscore_path]:
