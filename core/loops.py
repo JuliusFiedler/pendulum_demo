@@ -653,7 +653,7 @@ class BalanceLoop(GameLoop):
             self.highscore_dict = json.load(f)
         res = sorted(self.highscore_dict.items(), key=self.sorting_function, reverse=True)
         if res:
-            player_id, p_time = [0]
+            player_id, p_time = res[0]
             player = player_id.split("__")[-1]
             output = f"{np.round(p_time, 1)} s, von {player}"
         else:
