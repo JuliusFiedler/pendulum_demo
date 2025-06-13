@@ -131,3 +131,5 @@ dmypy.json
 
 # highscores
 /data/*highscore.json
+# but include templates
+!/data/*.template
