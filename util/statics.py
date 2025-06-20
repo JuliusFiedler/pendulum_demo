@@ -1,19 +1,27 @@
 import pygame
 import os
 
+# debug
+DEBUG = True
+
+
 # Organization
 GAME_NAME = "Inverses Pendel"
 
 # Display
-# DISPLAY_SIZE = (1500, 800)
-# assume a present display with 24-bit-depth and select highest possible resolution
-modes = pygame.display.list_modes(24)
-DISPLAY_SIZE = modes[0]
+if DEBUG:
+    DISPLAY_SIZE = (1500, 800)
+    os.environ["SDL_VIDEO_WINDOW_POS"] = f"{2000},{100}"
+else:
+    # assume a present display with 24-bit-depth and select highest possible resolution
+    modes = pygame.display.list_modes(24)
+    DISPLAY_SIZE = modes[0]
 FPS = 60
 
 # paths
 arrow_path = "img/arrow.png"
 arrow_green_path = "img/arrow_green.png"
+curved_arrow_path = "img/curved_arrow.png"
 rst_logo_path = "img/rst-logo.png"
 balance_highscore_path = "data/balance_highscore.json"
 swingup_highscore_path = "data/swingup_highscore.json"

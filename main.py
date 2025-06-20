@@ -12,8 +12,12 @@ from core.loops import HighscoreLoop, BalanceLoop, IntroLoop, SwingupLoop, Exper
 
 # display
 pygame.display.set_caption(stat.GAME_NAME)
-display_flags = pygame.FULLSCREEN
-game_display = pygame.display.set_mode(size=(stat.DISPLAY_SIZE), flags=display_flags)
+if stat.DEBUG:
+    game_display = pygame.display.set_mode((stat.DISPLAY_SIZE))
+else:
+    display_flags = pygame.FULLSCREEN
+    game_display = pygame.display.set_mode(size=(stat.DISPLAY_SIZE), flags=display_flags)
+
 
 # init stuff
 clock = pygame.time.Clock()

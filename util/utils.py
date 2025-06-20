@@ -65,7 +65,7 @@ class ToggleButton(Button):
         self.unactivated_active_color = unactivated_active_color
         self.activated_inactive_color = activated_inactive_color
         self.activated_active_color = activated_active_color
-        
+
     def toggle(self):
         self.active = not self.active
         self.active_color = self.activated_active_color if self.active else self.unactivated_active_color
@@ -73,7 +73,7 @@ class ToggleButton(Button):
 
     def get_active(self):
         return self.active
-        
+
 
 def text_to_screen(surf, text, pos, font=None, fontsize=16, color=None, rotation=0, return_rect=False):
     if font is None:
@@ -89,9 +89,9 @@ def text_to_screen(surf, text, pos, font=None, fontsize=16, color=None, rotation
         return obj_rect
 
 
-def print_on_screen(display, text, pos, font=NORMAL_FONT, text_color=BLACK):
+def print_on_screen(display, text, pos, font=NORMAL_FONT, text_color=BLACK, box_anchor="topleft"):
     text_surface, text_rect = text_objects(text, font, text_color)
-    display.blit(text_surface, text_surface.get_rect(topleft=(pos)))
+    display.blit(text_surface, text_surface.get_rect(**{box_anchor:(pos)}))
 
 def crash(highscore):
     message_display("You crashed!")
@@ -256,3 +256,38 @@ def project_to_interval(state, min=-np.pi, max=np.pi):
             state = angle
 
     return state
+
+def fill(surface, color):
+    """Fill all pixels of the surface with color, preserve transparency."""
+    w, h = surface.get_size()
+    r, g, b = color
+    for x in range(w):
+        for y in range(h):
+            a = surface.get_at((x, y))[3]
+            surface.set_at((x, y), pygame.Color(int(r), int(g), int(b), int(a)))
+    return surface
+
+def colorize(image, newColor):
+    """
+    Create a "colorized" copy of a surface (replaces RGB values with the given color, preserving the per-pixel alphas of
+    original).
+    :param image: Surface to create a colorized copy of
+    :param newColor: RGB color to use (original alpha values are preserved)
+    :return: New colorized Surface instance
+    """
+    image = image.copy()
+
+    # zero out RGB values
+    image.fill((0, 0, 0, 255), None, pygame.BLEND_RGBA_MULT)
+    # add in new RGB values
+    image.fill(newColor[0:3] + (0,), None, pygame.BLEND_RGBA_ADD)
+
+    return image
+
+def get_red_green_scale(percentage):
+    # https://stackoverflow.com/a/65904561/23370008
+    pct_diff = 1.0 - percentage
+    red_color = min(255, percentage*2 * 255)
+    green_color = min(255, pct_diff*2 * 255)
+    col = (red_color, green_color, 0)
+    return col

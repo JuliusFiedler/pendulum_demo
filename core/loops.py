@@ -117,7 +117,7 @@ class GameLoop(Loop):
 
         self.highscore_path = highscore_path
 
-        self.max_tries = 2 #! number of tries before returning to start screen. 2 for testing, ~10 for deployment
+        self.max_tries = 5 #! number of tries before returning to start screen. 2 for testing, ~10 for deployment
 
         self.x_threshold = 2.16/1000*stat.DISPLAY_SIZE[0] #2.16 this number results in nice ratios on screen
         def back(obj):
@@ -125,7 +125,7 @@ class GameLoop(Loop):
         self.return_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-70, 0, 70, 20, stat.RED, stat.LIGHT_RED, "Zurück", stat.NORMAL_FONT, action=back, action_args=[self])
         self.arrow_img = pygame.transform.scale(pygame.image.load(stat.arrow_path), (75,50))
         self.arrow_green_img = pygame.transform.scale(pygame.image.load(stat.arrow_green_path), (75,50))
-
+        self.c_arrow_img = pygame.transform.flip(pygame.transform.scale(pygame.image.load(stat.curved_arrow_path), (100,50)),False,True)
 
         self.init()
 
@@ -134,7 +134,7 @@ class GameLoop(Loop):
 
         self.length = 1
         self.F = self.F_initial
-        self.my = 0.00 # friction
+        self.my = 0.02 # friction
 
         self.next_action = 0
         self.t0 = time.time()
@@ -338,10 +338,10 @@ class GameLoop(Loop):
     def _render_ui(self):
         # show state on screen
         p = precision = 3
-        # u.print_on_screen(self.surf, f"pos {np.round(self.state[0], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 10))
-        # u.print_on_screen(self.surf, f"vel {np.round(self.state[1], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 30))
-        # u.print_on_screen(self.surf, f"ang {np.round(self.state[2], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 50))
-        # u.print_on_screen(self.surf, f"ome {np.round(self.state[3], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 70))
+        u.print_on_screen(self.surf, f"pos {np.round(self.state[0], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 10))
+        u.print_on_screen(self.surf, f"vel {np.round(self.state[1], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 30))
+        u.print_on_screen(self.surf, f"ang {np.round(self.state[2], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 50))
+        u.print_on_screen(self.surf, f"ome {np.round(self.state[3], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 70))
         if self.action is not None:
             u.print_on_screen(self.surf, f"Kraft {np.round(self.action, p)}", (int(stat.DISPLAY_SIZE[0] / 2), 120))
         if self.countdown:
@@ -431,7 +431,7 @@ class GameLoop(Loop):
 
     def enter_name_highscore(self, highscores:list, position:int):
         """highscores is a list of tuples [("1235142561__bob", 1.5), ("1238713812__mob", 2.4)]"""
-        self.input_box = u.InputBox(100, 127+position*40, 300, 20, "Name")
+        self.input_box = u.InputBox(100, 127+position*40, 300, 20, "")
         pygame.event.pump()
         done = False
         while(not done):
@@ -440,6 +440,7 @@ class GameLoop(Loop):
             self._render_init()
             self._render_cart()
             u.print_on_screen(self.display, f"Highscore", (10, 10), stat.LARGE_FONT)
+            u.print_on_screen(self.display, f"Namen eingeben", (stat.DISPLAY_SIZE[0]//2, stat.DISPLAY_SIZE[1]//2), stat.LARGE_FONT, box_anchor="center")
             for i, (player_id, p_time) in enumerate(highscores):
                 player = player_id.split("__")[-1]
                 y = 130+i*40
@@ -772,10 +773,12 @@ class SwingupLoop(GameLoop):
     def __init__(self, game_display, clock, highscore_path):
         super().__init__(game_display, clock, highscore_path)
         self.theta_threshold_radians = 5 * 2 * math.pi / 360
-        self.theta_dot_threshold = 3 * self.theta_threshold_radians
-        self.x_dot_threshold = 2.16/10  # 10% of track width per second
+        self.theta_dot_threshold = 4 * 3 * self.theta_threshold_radians
+        self.x_dot_threshold = 2 * 2.16/10  # 10% of track width per second
         self.success = False
 
+        self.reset_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 50, 120, 30, stat.BLUE, stat.LIGHT_BLUE, \
+            "Reset", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.reset, action_args=[])
 
     def get_terminated(self):
         x, x_dot, theta, theta_dot = self.state
@@ -827,22 +830,60 @@ class SwingupLoop(GameLoop):
         self._render_ui()
         u.print_on_screen(self.surf, f"Richte das Pendel auf. Du hast {self.max_tries} Versuche.", (10, 260), stat.MEDIUM_FONT)
         self.display.blit(self.surf, (0, 0))
+        self.reset_button.show()
         self._event_handling()
         self._render_post_pro()
 
     def _render_custom(self):
-        x = self.state
+        x, x_dot, theta, theta_dot = self.state
+        # x = self.state
         world_width = self.x_threshold * 2
         scale = stat.DISPLAY_SIZE[0] / world_width
 
         axleoffset = self.cartheight / 4.0
-        cartx = x[0] * scale + stat.DISPLAY_SIZE[0] / 2.0  # MIDDLE OF CART
+        cartx = x * scale + stat.DISPLAY_SIZE[0] / 2.0  # MIDDLE OF CART
         carty = 100  # TOP OF CART
         p0 = (cartx, carty)
         alpha = self.theta_threshold_radians
         p1 = (cartx + sin(alpha) * scale/2, carty + axleoffset + cos(alpha) * scale/2)
         p2 = (cartx + sin(-alpha) * scale/2, carty + axleoffset + cos(-alpha) * scale/2)
-        gfxdraw.filled_polygon(self.surf, (p0, p1, p2), stat.LIGHT_GREEN)
+        # visualize goal
+        ## angle
+        theta = theta % (2*np.pi)
+        if theta < self.theta_threshold_radians or 2*np.pi-theta < self.theta_threshold_radians:
+            color = stat.LIGHT_GREEN
+        else:
+            color = stat.LIGHT_RED
+        gfxdraw.filled_polygon(self.surf, (p0, p1, p2), color)
+        ## angular velocity
+        arr_scale = 1
+        if theta_dot >= 0:
+            img = pygame.transform.scale_by(self.c_arrow_img, arr_scale)
+        else:
+            img = pygame.transform.flip(pygame.transform.scale_by(self.c_arrow_img, arr_scale), True, False)
+
+        max_thdot = 10
+        pct = min(np.abs(theta_dot)/max_thdot, 1)
+        col = u.get_red_green_scale(pct)
+        img = u.colorize(img, col)
+
+        self.surf.blit(img, (cartx - img.get_size()[0]//2, carty + 15))
+
+        ## cart velocity
+        arr_scale = 1
+        if x_dot >= 0:
+            img = pygame.transform.scale_by(self.arrow_green_img, arr_scale)
+        else:
+            img = pygame.transform.flip(pygame.transform.scale_by(self.arrow_green_img, arr_scale), True, False)
+
+        max_xdot = 4
+        pct = min(np.abs(x_dot)/max_xdot, 1)
+        col = u.get_red_green_scale(pct)
+        img = u.colorize(img, col)
+        self.surf.blit(img, (cartx - img.get_size()[0]//2, carty - 80))
+
+
+
         self.display.blit(self.surf, (0, 0))
 
 
