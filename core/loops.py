@@ -338,10 +338,10 @@ class GameLoop(Loop):
     def _render_ui(self):
         # show state on screen
         p = precision = 3
-        # u.print_on_screen(self.surf, f"pos {np.round(x[0], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 10))
-        # u.print_on_screen(self.surf, f"vel {np.round(x[1], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 30))
-        # u.print_on_screen(self.surf, f"ang {np.round(x[2], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 50))
-        # u.print_on_screen(self.surf, f"ome {np.round(x[3], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 70))
+        # u.print_on_screen(self.surf, f"pos {np.round(self.state[0], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 10))
+        # u.print_on_screen(self.surf, f"vel {np.round(self.state[1], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 30))
+        # u.print_on_screen(self.surf, f"ang {np.round(self.state[2], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 50))
+        # u.print_on_screen(self.surf, f"ome {np.round(self.state[3], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 70))
         if self.action is not None:
             u.print_on_screen(self.surf, f"Kraft {np.round(self.action, p)}", (int(stat.DISPLAY_SIZE[0] / 2), 120))
         if self.countdown:
