@@ -114,6 +114,7 @@ class GameLoop(Loop):
         self.tau = 0.01  # seconds between state updates
         self.kinematics_integrator = "solve_ivp"  # "euler"
         self.F_initial = 7
+        self.my_initial = 0.02
 
         self.highscore_path = highscore_path
 
@@ -134,7 +135,7 @@ class GameLoop(Loop):
 
         self.length = 1
         self.F = self.F_initial
-        self.my = 0.02 # friction
+        self.my = self.my_initial # friction
 
         self.next_action = 0
         self.t0 = time.time()
@@ -479,6 +480,7 @@ class ControlLoop(GameLoop):
         super().__init__(game_display, clock, None)
         self.reset_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 50, 120, 30, stat.BLUE, stat.LIGHT_BLUE, "Reset", stat.NORMAL_FONT, text_color=stat.WHITE, action=self.reset, action_args=[])
         self.toggle_mode_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-120, 90, 120, 30, stat.ORANGE, stat.LIGHT_ORANGE, "Aufschwingen", stat.NORMAL_FONT, text_color=stat.BLACK, action=self.toggle_mode, action_args=[])
+        self.my_initial = 0
 
         self.swingup_actions = []
         # load swingup trajectory

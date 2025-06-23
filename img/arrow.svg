@@ -24,9 +24,9 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      showgrid="false"
-     inkscape:zoom="1.6819304"
-     inkscape:cx="520.23556"
-     inkscape:cy="1032.1473"
+     inkscape:zoom="0.4204826"
+     inkscape:cx="142.69318"
+     inkscape:cy="806.21648"
      inkscape:window-width="1920"
      inkscape:window-height="1137"
      inkscape:window-x="1912"
@@ -35,6 +35,25 @@
      inkscape:current-layer="layer1" />
   <defs
      id="defs2">
+    <marker
+       style="overflow:visible"
+       id="Arrow2"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow2"
+       markerWidth="7.6999998"
+       markerHeight="5.5999999"
+       viewBox="0 0 7.7 5.6"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.7)"
+         d="M -2,-4 9,0 -2,4 c 2,-2.33 2,-5.66 0,-8 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="arrow2L" />
+    </marker>
     <marker
        style="overflow:visible"
        id="TriangleStart"
@@ -131,5 +150,22 @@
          inkscape:transform-center-y="0.0087787946"
          transform="rotate(0.59120661,-3799.7135,903.89495)" />
     </g>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;marker-end:url(#Arrow2)"
+       id="path313"
+       sodipodi:type="arc"
+       sodipodi:cx="179.74863"
+       sodipodi:cy="-239.7506"
+       sodipodi:rx="44.763756"
+       sodipodi:ry="44.763756"
+       sodipodi:start="0"
+       sodipodi:end="2.5768026"
+       sodipodi:open="true"
+       sodipodi:arc-type="arc"
+       d="m 224.51238,-239.7506 a 44.763756,44.763756 0 0 1 -32.29004,42.9907 44.763756,44.763756 0 0 1 -50.2857,-19.03141"
+       transform="scale(-1)"
+       inkscape:export-filename="curved_arrow.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
   </g>
 </svg>
