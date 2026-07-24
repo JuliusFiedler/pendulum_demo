@@ -1,3 +1,8 @@
+# /// script
+# dependencies = ["numpy"]
+# ///
+
+import asyncio
 import pygame
 # import sys
 # import time
@@ -32,6 +37,11 @@ intro_loop = IntroLoop(game_display, clock, loops=[balance_loop, swingup_loop, h
 
 
 # gogo
-intro_loop.run()
+# async entry point: same code runs natively (python main.py) and in the
+# browser via pygbag, which patches asyncio.run for the WASM event loop.
+async def main():
+    await intro_loop.run()
+
+asyncio.run(main())
 
 

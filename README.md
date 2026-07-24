@@ -8,6 +8,12 @@
 ## Execution
 - run `python main.py`
 
+## Build for web (pygbag)
+- `uv pip install pygbag`
+- test in browser: `python -m pygbag main.py` -> http://localhost:8000
+- build static files: `python -m pygbag --build main.py` -> `build/web/`
+- `pygbag.ini` excludes `.venv`/`.git`/`build`/... from the bundle (leading slash required)
+
 ## Parameters
 - `core/loops.py` line 96 -> max tries before returning to start screen
 

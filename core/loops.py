@@ -1,13 +1,14 @@
 from abc import abstractmethod
+import asyncio
 import pygame
 from pygame import gfxdraw
 import numpy as np
 from numpy import sin, cos
 import math
 import sys, os
-from scipy.integrate import solve_ivp
+# from scipy.integrate import solve_ivp
 import time
-from ipydex import IPS
+# from ipydex import IPS
 import json
 import bisect
 import csv
@@ -48,20 +49,26 @@ class IntroLoop(Loop):
         self.logo_pos = (stat.DISPLAY_SIZE[0]//2-self.rst_logo.get_rect().width//2, stat.DISPLAY_SIZE[1] //2)
 
 
-    def run(self):
+    async def run(self):
         global tb_joyaxis  # Weder gut noch schön, aber gar keine Motivation den Status des ToggleButton durch *alle* Funktionsaufrufe zu ziehen
+        # Sub-loops are coroutines now, so a button can't launch one directly (it
+        # would just create an un-awaited coroutine). Instead the button records
+        # which loop to start, and the async loop below awaits it.
+        self._pending_loop = None
+        def launch(loop):
+            self._pending_loop = loop
         tb_joyaxis = u.ToggleButton(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*5, self.b_size[0], self.b_size[1], \
                 stat.RED, stat.LIGHT_RED, stat.GREEN, stat.LIGHT_GREEN, "Gamepad-Eingabe", stat.BUTTON_FONT)
         b_stabilize = u.Button(self.display, self.b_pos[0], self.b_pos[1], self.b_size[0], self.b_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Balancieren", stat.BUTTON_FONT, action=self.loops[0].run)
+                stat.GREEN, stat.LIGHT_GREEN, "Balancieren", stat.BUTTON_FONT, action=launch, action_args=[self.loops[0]])
         b_multi = u.Button(self.display, self.b_pos[0], self.b_pos[1]+self.b_size[1]+5, self.b_size[0], self.b_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Aufschwingen", stat.BUTTON_FONT, action=self.loops[1].run)
+                stat.GREEN, stat.LIGHT_GREEN, "Aufschwingen", stat.BUTTON_FONT, action=launch, action_args=[self.loops[1]])
         b_hs = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*2, self.b_size[0], self.b_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Highscore", stat.BUTTON_FONT, action=self.loops[2].run)
+                stat.GREEN, stat.LIGHT_GREEN, "Highscore", stat.BUTTON_FONT, action=launch, action_args=[self.loops[2]])
         b_exp = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*3, self.b_size[0], self.b_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Experiment", stat.BUTTON_FONT, action=self.loops[3].run, action_args=[])
+                stat.GREEN, stat.LIGHT_GREEN, "Experiment", stat.BUTTON_FONT, action=launch, action_args=[self.loops[3]])
         b_control = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*4, self.b_size[0], self.b_size[1], \
-                stat.GREEN, stat.LIGHT_GREEN, "Regelung", stat.BUTTON_FONT, action=self.loops[4].run)
+                stat.GREEN, stat.LIGHT_GREEN, "Regelung", stat.BUTTON_FONT, action=launch, action_args=[self.loops[4]])
         b_exit = u.Button(self.display, self.b_pos[0], self.b_pos[1]+(self.b_size[1]+5)*6, self.b_size[0], self.b_size[1], \
                 stat.GREEN, stat.LIGHT_GREEN, "Beenden", stat.BUTTON_FONT, action=exit_proxy)
         while True:
@@ -97,6 +104,13 @@ class IntroLoop(Loop):
             b_exit.show()
 
             pygame.display.update()
+
+            # a button was clicked -> run the selected sub-loop, then come back
+            if self._pending_loop is not None:
+                loop = self._pending_loop
+                self._pending_loop = None
+                await loop.run()
+            await asyncio.sleep(0)  # yield each frame (required for web/pygbag)
 
 class GameLoop(Loop):
     def __init__(self, game_display, clock, highscore_path) -> None:
@@ -159,6 +173,10 @@ class GameLoop(Loop):
     def get_highscore(self):
         return ""
 
+    def euler(self, rhs, xx0):
+        dxdt = np.array(rhs(None, self.state))
+        return self.state + self.tau * dxdt
+
     def calc_new_state(self, action):
         x, x_dot, theta, theta_dot = self.state
         # based on mathematical pendulum
@@ -183,11 +201,14 @@ class GameLoop(Loop):
 
         tt = np.linspace(0, self.tau, 2)
         xx0 = np.array(self.state).flatten()
-        s = solve_ivp(rhs, (0, self.tau), xx0, t_eval=tt)
 
-        x, x_dot, theta, theta_dot = s.y[:, -1].flatten()
+        # s = solve_ivp(rhs, (0, self.tau), xx0, t_eval=tt)
+        # x, x_dot, theta, theta_dot = s.y[:, -1].flatten()
+        # state = (x, x_dot, theta, theta_dot)
 
-        state = (x, x_dot, theta, theta_dot)
+        state = self.euler(rhs, xx0)
+
+
         return state
 
     def get_action(self):
@@ -415,22 +436,23 @@ class GameLoop(Loop):
         self.clock.tick(stat.FPS)
         pygame.display.flip()
 
-    def run(self):
+    async def run(self):
         self.init()
         while(not self.exit):
             state, reward, terminated, truncated, info = self.step()
             if terminated or truncated:
                 self.reset()
+            await asyncio.sleep(0)  # yield each frame (required for web/pygbag)
         if self.current_best:
             hs, pos = self.get_highscore_and_position()
             # low results will not be shown
             if pos <= 17:
-                self.enter_name_highscore(highscores=hs, position=pos)
+                await self.enter_name_highscore(highscores=hs, position=pos)
 
     def get_highscore_and_position(self):
         return None, None
 
-    def enter_name_highscore(self, highscores:list, position:int):
+    async def enter_name_highscore(self, highscores:list, position:int):
         """highscores is a list of tuples [("1235142561__bob", 1.5), ("1238713812__mob", 2.4)]"""
         self.input_box = u.InputBox(100, 127+position*40, 300, 20, "")
         pygame.event.pump()
@@ -459,6 +481,7 @@ class GameLoop(Loop):
             self.input_box.show(self.display)
             self.clock.tick(stat.FPS)
             pygame.display.flip()
+            await asyncio.sleep(0)  # yield each frame (required for web/pygbag)
         player_id = f"{time.time()}__{self.input_box.text}"
         self.highscore_dict[player_id] = self.current_best
         with open(self.highscore_path, "wt") as f:
@@ -901,7 +924,7 @@ class HighscoreLoop(Loop):
             obj.done = True
         self.return_button = u.Button(self.display, stat.DISPLAY_SIZE[0]-70, 0, 70, 20, stat.RED, stat.LIGHT_RED, "Zurück", stat.NORMAL_FONT, action=back, action_args=[self])
 
-    def run(self):
+    async def run(self):
         self.done = False
         with open(self.balance_highscore_path, "rt") as f:
             self.balance_highscore_dict = json.load(f)
@@ -933,4 +956,5 @@ class HighscoreLoop(Loop):
             self.return_button.show()
             self.clock.tick(stat.FPS)
             pygame.display.flip()
+            await asyncio.sleep(0)  # yield each frame (required for web/pygbag)
 
