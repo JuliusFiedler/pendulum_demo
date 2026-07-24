@@ -15,6 +15,9 @@ import csv
 
 import util.statics as stat
 import util.utils as u
+import util.leaderboard as lb
+
+IS_WEB = sys.platform == "emscripten"
 
 def exit_proxy():
     pygame.quit()
@@ -445,13 +448,30 @@ class GameLoop(Loop):
                 self.reset()
             await asyncio.sleep(0)  # yield each frame (required for web/pygbag)
         if self.current_best:
-            hs, pos = self.get_highscore_and_position()
+            if IS_WEB:
+                hs, pos = await self._web_hs_and_position()
+            else:
+                hs, pos = self.get_highscore_and_position()
             # low results will not be shown
-            if pos <= 17:
+            if pos is not None and pos <= 17:
                 await self.enter_name_highscore(highscores=hs, position=pos)
 
     def get_highscore_and_position(self):
         return None, None
+
+    async def _web_hs_and_position(self):
+        """Web: fetch the leaderboard from Supabase and find where current_best
+        ranks. Same shape as get_highscore_and_position: a list of ("__name",
+        time) tuples with ("", current_best) inserted at the found position."""
+        scores = await lb.top(self.game_id, self.ascending, limit=1000)  # best-first
+        times = [s["time_s"] for s in scores]
+        if self.ascending:
+            pos = bisect.bisect_right(times, self.current_best)
+        else:
+            pos = bisect.bisect_right([-t for t in times], -self.current_best)
+        highscores = [(f"__{s['name']}", s["time_s"]) for s in scores]
+        highscores.insert(pos, ("", self.current_best))
+        return highscores, pos
 
     async def enter_name_highscore(self, highscores:list, position:int):
         """highscores is a list of tuples [("1235142561__bob", 1.5), ("1238713812__mob", 2.4)]"""
@@ -483,10 +503,13 @@ class GameLoop(Loop):
             self.clock.tick(stat.FPS)
             pygame.display.flip()
             await asyncio.sleep(0)  # yield each frame (required for web/pygbag)
-        player_id = f"{time.time()}__{self.input_box.text}"
-        self.highscore_dict[player_id] = self.current_best
-        with open(self.highscore_path, "wt") as f:
-            json.dump(self.highscore_dict, f)
+        if IS_WEB:
+            await lb.submit(self.game_id, self.input_box.text, self.current_best)
+        else:
+            player_id = f"{time.time()}__{self.input_box.text}"
+            self.highscore_dict[player_id] = self.current_best
+            with open(self.highscore_path, "wt") as f:
+                json.dump(self.highscore_dict, f)
 
 
 class ControlLoop(GameLoop):
@@ -642,6 +665,9 @@ class ControlLoop(GameLoop):
 
 
 class BalanceLoop(GameLoop):
+    game_id = "balance"   # online leaderboard key (web build)
+    ascending = False     # longer balance time = better
+
     def __init__(self, game_display, clock, highscore_path):
         super().__init__(game_display, clock, highscore_path)
         # Angle at which to fail the episode
@@ -678,6 +704,8 @@ class BalanceLoop(GameLoop):
         return [0, 0, (np.random.random()-0.5)*0.1, 0]
 
     def get_highscore(self):
+        if IS_WEB:
+            return ""  # sync init can't await; leaderboard is shown on the Highscore screen
         with open(self.highscore_path, "rt") as f:
             self.highscore_dict = json.load(f)
         res = sorted(self.highscore_dict.items(), key=self.sorting_function, reverse=True)
@@ -796,6 +824,9 @@ class ExperimentalLoop(GameLoop):
         self.toggle_endless_button.show()
 
 class SwingupLoop(GameLoop):
+    game_id = "swingup"   # online leaderboard key (web build)
+    ascending = True      # faster swing-up (lower time) = better
+
     def __init__(self, game_display, clock, highscore_path):
         super().__init__(game_display, clock, highscore_path)
         self.theta_threshold_radians = 5 * 2 * math.pi / 360
@@ -838,6 +869,8 @@ class SwingupLoop(GameLoop):
         return [0, 0, np.pi + (np.random.random()-0.5)*0.1, 0]
 
     def get_highscore(self):
+        if IS_WEB:
+            return ""  # sync init can't await; leaderboard is shown on the Highscore screen
         with open(self.highscore_path, "rt") as f:
             self.highscore_dict = json.load(f)
         res = sorted(self.highscore_dict.items(), key=self.sorting_function)
@@ -927,13 +960,19 @@ class HighscoreLoop(Loop):
 
     async def run(self):
         self.done = False
-        with open(self.balance_highscore_path, "rt") as f:
-            self.balance_highscore_dict = json.load(f)
-        balance_highscores = sorted(self.balance_highscore_dict.items(), reverse=True, key=self.sorting_function)
+        if IS_WEB:
+            # fetch shared leaderboard from Supabase; build (player_id, time)
+            # tuples so the display code below works unchanged
+            balance_highscores = [(f"__{s['name']}", s["time_s"]) for s in await lb.top("balance", False)]
+            swingup_highscores = [(f"__{s['name']}", s["time_s"]) for s in await lb.top("swingup", True)]
+        else:
+            with open(self.balance_highscore_path, "rt") as f:
+                self.balance_highscore_dict = json.load(f)
+            balance_highscores = sorted(self.balance_highscore_dict.items(), reverse=True, key=self.sorting_function)
 
-        with open(self.swingup_highscore_path, "rt") as f:
-            self.swingup_highscore_dict = json.load(f)
-        swingup_highscores = sorted(self.swingup_highscore_dict.items(), key=self.sorting_function)
+            with open(self.swingup_highscore_path, "rt") as f:
+                self.swingup_highscore_dict = json.load(f)
+            swingup_highscores = sorted(self.swingup_highscore_dict.items(), key=self.sorting_function)
 
         pygame.event.pump()
         while(not self.done):
