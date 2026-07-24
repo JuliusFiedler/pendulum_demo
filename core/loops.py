@@ -119,7 +119,8 @@ class IntroLoop(Loop):
 class GameLoop(Loop):
     def __init__(self, game_display, clock, highscore_path) -> None:
         super().__init__(game_display, clock)
-
+        self.step_count = 0
+        self.t0_test = time.time()
         # render
         self.cartwidth = 50.0
         self.cartheight = 30.0
@@ -219,6 +220,7 @@ class GameLoop(Loop):
         return self.next_action
 
     def step(self):
+        self.step_count += 1
         action = self.get_action()
         self.action = action
         if not self.countdown:
@@ -368,6 +370,7 @@ class GameLoop(Loop):
         u.print_on_screen(self.surf, f"vel {np.round(self.state[1], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 30))
         u.print_on_screen(self.surf, f"ang {np.round(self.state[2], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 50))
         u.print_on_screen(self.surf, f"ome {np.round(self.state[3], p)}", (int(stat.DISPLAY_SIZE[0] / 2), 70))
+        u.print_on_screen(self.surf, f"step {self.step_count}, steps per sec={np.round(self.step_count/(time.time()-self.t0_test), 1)}", (int(stat.DISPLAY_SIZE[0] / 2), 90))
         if self.action is not None:
             u.print_on_screen(self.surf, f"Kraft {np.round(self.action, p)}", (int(stat.DISPLAY_SIZE[0] / 2), 120))
         if self.countdown:
