@@ -2,7 +2,7 @@ import pygame
 import os
 
 # debug
-DEBUG = True
+DEBUG = False
 
 
 # Organization
@@ -52,6 +52,9 @@ LARGE_FONT = pygame.font.Font("freesansbold.ttf", 115)
 MEDIUM_FONT = pygame.font.Font("freesansbold.ttf", 40)
 BUTTON_FONT = pygame.font.Font("freesansbold.ttf", 40)
 NORMAL_FONT = pygame.font.SysFont(None, 25)
+
+# Game constants
+ZERO_LINE = 300
 
 # debug
 MEASURE_TIME = False

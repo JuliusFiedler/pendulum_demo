@@ -263,7 +263,7 @@ class GameLoop(Loop):
         l, r, t, b = -self.cartwidth / 2, self.cartwidth / 2, self.cartheight / 2, -self.cartheight / 2
         axleoffset = self.cartheight / 4.0
         cartx = x[0] * scale + stat.DISPLAY_SIZE[0] / 2.0  # MIDDLE OF CART
-        carty = 100  # TOP OF CART
+        carty = stat.ZERO_LINE  # TOP OF CART
         cart_coords = [(l, b), (l, t), (r, t), (r, b)]
         cart_coords = [(c[0] + cartx, c[1] + carty) for c in cart_coords]
         gfxdraw.aapolygon(self.surf, cart_coords, (0, 0, 0))
@@ -844,7 +844,7 @@ class SwingupLoop(GameLoop):
 
         axleoffset = self.cartheight / 4.0
         cartx = x * scale + stat.DISPLAY_SIZE[0] / 2.0  # MIDDLE OF CART
-        carty = 100  # TOP OF CART
+        carty = stat.ZERO_LINE  # TOP OF CART
         p0 = (cartx, carty)
         alpha = self.theta_threshold_radians
         p1 = (cartx + sin(alpha) * scale/2, carty + axleoffset + cos(alpha) * scale/2)
