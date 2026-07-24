@@ -36,17 +36,11 @@ _KEY = (
 )
 
 if IS_WEB:
-    import platform  # pygbag: platform.window is the JS window proxy
+    import platform  # pygbag: platform.window / platform.jsiter bridge JS async
 
-
-def _opts(method, body=None):
-    """Build a JS fetch options object from Python via JSON.parse (pygbag-safe)."""
-    o = {"method": method, "headers": {"apikey": _KEY, "Authorization": f"Bearer {_KEY}"}}
-    if body is not None:
-        o["headers"]["Content-Type"] = "application/json"
-        o["headers"]["Prefer"] = "return=minimal"
-        o["body"] = body
-    return platform.window.JSON.parse(json.dumps(o))
+# The apikey is passed as a query parameter because pygbag's Fetch.GET/POST
+# helpers can't set custom headers. Supabase's gateway accepts ?apikey=... .
+_AUTH = f"apikey={_KEY}"
 
 
 async def submit(game, name, time_s):
@@ -54,9 +48,11 @@ async def submit(game, name, time_s):
     if not IS_WEB:
         return
     name = (str(name).strip() or "anon")[:20]
-    row = json.dumps({"game": game, "name": name, "time_s": float(time_s)})
+    body = json.dumps({"game": game, "name": name, "time_s": float(time_s)})
     try:
-        await platform.window.fetch(_URL, _opts("POST", row))
+        # platform.jsiter bridges pygbag's JS Fetch to a Python awaitable; a bare
+        # `await platform.window.fetch(...)` never resolves and hangs the game.
+        await platform.jsiter(platform.window.Fetch.POST(f"{_URL}?{_AUTH}", body))
     except Exception as e:  # noqa: BLE001 -- a failed submit must not kill the game
         print("leaderboard submit failed:", e, flush=True)
 
@@ -66,11 +62,13 @@ async def top(game, ascending, limit=17):
     if not IS_WEB:
         return []
     order = "asc" if ascending else "desc"
-    url = f"{_URL}?game=eq.{game}&select=name,time_s&order=time_s.{order}&limit={limit}"
+    url = (f"{_URL}?game=eq.{game}&select=name,time_s"
+           f"&order=time_s.{order}&limit={limit}&{_AUTH}")
     try:
-        resp = await platform.window.fetch(url, _opts("GET"))
-        text = await resp.text()
-        return json.loads(str(text))
+        text = await platform.jsiter(platform.window.Fetch.GET(url))
+        data = json.loads(str(text))
+        # a Supabase error is a dict, not a list -> treat as empty board
+        return data if isinstance(data, list) else []
     except Exception as e:  # noqa: BLE001
         print("leaderboard fetch failed:", e, flush=True)
         return []
