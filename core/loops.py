@@ -131,6 +131,11 @@ class GameLoop(Loop):
         self.masscart = 1.0
         self.masspole = 0.1
         self.tau = 0.01  # seconds between state updates
+        # frame-rate independence: run one physics (tau) step per sim_dt of REAL
+        # time, so difficulty is identical whether the machine renders at 45 or
+        # 60 FPS. sim_dt = 1/FPS reproduces the original 60-FPS feel.
+        self.sim_dt = 1.0 / stat.FPS
+        self.max_substeps = 10  # cap catch-up steps (avoids spiral of death)
         self.kinematics_integrator = "solve_ivp"  # "euler"
         self.F_initial = 7
         self.my_initial = 0.02
@@ -169,6 +174,10 @@ class GameLoop(Loop):
         self.number_of_tries = -1
         self.countdown = False
         self.countdown_start = None
+
+        # fixed-timestep accumulator (frame-rate independent physics)
+        self._accum = 0.0
+        self._phys_t = time.perf_counter()
 
         self.highscore = self.get_highscore()
         self.reset()
@@ -221,11 +230,27 @@ class GameLoop(Loop):
 
     def step(self):
         self.step_count += 1
-        action = self.get_action()
-        self.action = action
-        if not self.countdown:
-            self.state = self.calc_new_state(action)
-            self.last_state = self.state
+        if self.countdown:
+            # physics frozen during the countdown; keep the clock fresh so play
+            # doesn't start with a burst of catch-up steps
+            self.action = self.get_action()
+            self._phys_t = time.perf_counter()
+            self._accum = 0.0
+        else:
+            # advance the sim by the REAL time elapsed since the last frame, in
+            # fixed sim_dt steps -> same speed at any frame rate
+            now = time.perf_counter()
+            self._accum = min(self._accum + (now - self._phys_t),
+                              self.max_substeps * self.sim_dt)  # clamp backlog
+            self._phys_t = now
+            n = 0
+            while self._accum >= self.sim_dt and n < self.max_substeps:
+                action = self.get_action()
+                self.action = action
+                self.state = self.calc_new_state(action)
+                self.last_state = self.state
+                self._accum -= self.sim_dt
+                n += 1
         self.render()
 
         terminated = self.get_terminated()
