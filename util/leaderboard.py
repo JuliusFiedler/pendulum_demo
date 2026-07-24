@@ -36,11 +36,9 @@ _KEY = (
 )
 
 if IS_WEB:
-    import platform  # pygbag: platform.window / platform.jsiter bridge JS async
+    import platform  # pygbag: platform.window is the JS window proxy
 
-# The apikey is passed as a query parameter because pygbag's Fetch.GET/POST
-# helpers can't set custom headers. Supabase's gateway accepts ?apikey=... .
-_AUTH = f"apikey={_KEY}"
+_HEADERS = {"apikey": _KEY, "Authorization": f"Bearer {_KEY}"}
 
 
 def _js(obj):
@@ -48,20 +46,28 @@ def _js(obj):
     return platform.window.JSON.parse(json.dumps(obj))
 
 
+async def _await(promise):
+    """Await a JS promise. window.iterator yields the resolved value at the end;
+    pygbag's Fetch.GET/POST generators do NOT (they only yield a placeholder),
+    which is why jsiter(Fetch.GET(...)) returns 'undefined' and reads came back
+    empty. A bare `await promise` never resolves and hangs."""
+    return await platform.jsiter(platform.window.iterator(promise))
+
+
 async def submit(game, name, time_s):
     """Insert one score. No-op on native. Never raises (network is best-effort)."""
     if not IS_WEB:
         return
     name = (str(name).strip() or "anon")[:20]
-    body = json.dumps({"game": game, "name": name, "time_s": float(time_s)})
-    # pygbag's Fetch.POST sets no Content-Type (Supabase then 400s) but forwards
-    # a 3rd `flags` arg to fetch(); pass method/headers/body through it. jsiter
-    # bridges the JS generator to an awaitable (a bare fetch() promise hangs).
-    flags = _js({"method": "POST",
-                 "headers": {"Content-Type": "application/json"},
-                 "body": body})
+    opts = _js({
+        "method": "POST",
+        "headers": {**_HEADERS, "Content-Type": "application/json"},
+        "body": json.dumps({"game": game, "name": name, "time_s": float(time_s)}),
+    })
     try:
-        await platform.jsiter(platform.window.Fetch.POST(f"{_URL}?{_AUTH}", "", flags))
+        # only await the response headers; don't read the (maybe empty) body,
+        # which would hang window.iterator on a falsy value
+        await _await(platform.window.fetch(_URL, opts))
     except Exception as e:  # noqa: BLE001 -- a failed submit must not kill the game
         print("leaderboard submit failed:", e, flush=True)
 
@@ -72,9 +78,10 @@ async def top(game, ascending, limit=17):
         return []
     order = "asc" if ascending else "desc"
     url = (f"{_URL}?game=eq.{game}&select=name,time_s"
-           f"&order=time_s.{order}&limit={limit}&{_AUTH}")
+           f"&order=time_s.{order}&limit={limit}")
     try:
-        text = await platform.jsiter(platform.window.Fetch.GET(url))
+        resp = await _await(platform.window.fetch(url, _js({"method": "GET", "headers": _HEADERS})))
+        text = await _await(resp.text())
         data = json.loads(str(text))
         # a Supabase error is a dict, not a list -> treat as empty board
         return data if isinstance(data, list) else []
