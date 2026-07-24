@@ -43,16 +43,25 @@ if IS_WEB:
 _AUTH = f"apikey={_KEY}"
 
 
+def _js(obj):
+    """Python dict/list -> real JS object (pygbag has no direct dict marshaling)."""
+    return platform.window.JSON.parse(json.dumps(obj))
+
+
 async def submit(game, name, time_s):
     """Insert one score. No-op on native. Never raises (network is best-effort)."""
     if not IS_WEB:
         return
     name = (str(name).strip() or "anon")[:20]
     body = json.dumps({"game": game, "name": name, "time_s": float(time_s)})
+    # pygbag's Fetch.POST sets no Content-Type (Supabase then 400s) but forwards
+    # a 3rd `flags` arg to fetch(); pass method/headers/body through it. jsiter
+    # bridges the JS generator to an awaitable (a bare fetch() promise hangs).
+    flags = _js({"method": "POST",
+                 "headers": {"Content-Type": "application/json"},
+                 "body": body})
     try:
-        # platform.jsiter bridges pygbag's JS Fetch to a Python awaitable; a bare
-        # `await platform.window.fetch(...)` never resolves and hangs the game.
-        await platform.jsiter(platform.window.Fetch.POST(f"{_URL}?{_AUTH}", body))
+        await platform.jsiter(platform.window.Fetch.POST(f"{_URL}?{_AUTH}", "", flags))
     except Exception as e:  # noqa: BLE001 -- a failed submit must not kill the game
         print("leaderboard submit failed:", e, flush=True)
 
