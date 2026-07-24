@@ -101,7 +101,8 @@ class IntroLoop(Loop):
             b_exp.show()
             b_control.show()
             tb_joyaxis.show()
-            b_exit.show()
+            if not sys.platform == "emscripten":
+                b_exit.show()
 
             pygame.display.update()
 

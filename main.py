@@ -3,11 +3,14 @@
 # ///
 
 import asyncio
+import sys
 import pygame
-# import sys
 # import time
 # import random
 # import numpy as np
+
+# pygbag sets sys.platform == "emscripten" in the browser
+IS_WEB = sys.platform == "emscripten"
 
 pygame.init()
 
@@ -17,7 +20,9 @@ from core.loops import HighscoreLoop, BalanceLoop, IntroLoop, SwingupLoop, Exper
 
 # display
 pygame.display.set_caption(stat.GAME_NAME)
-if stat.DEBUG:
+if stat.DEBUG or IS_WEB:
+    # windowed: in the browser this keeps the page/OS bars visible instead of
+    # taking over the whole screen via the Fullscreen API
     game_display = pygame.display.set_mode((stat.DISPLAY_SIZE))
 else:
     display_flags = pygame.FULLSCREEN
